@@ -171,7 +171,7 @@ def area_under_curve(curve_df: pd.DataFrame, x_col: str, y_col: str) -> float:
     if len(valid_curve) < 2:
         return math.nan
 
-    return float(np.trapz(valid_curve[y_col], valid_curve[x_col]))
+    return float(np.trapezoid(valid_curve[y_col], valid_curve[x_col]))
 
 
 def uplift_summary_metrics(
