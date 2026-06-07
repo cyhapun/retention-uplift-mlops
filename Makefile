@@ -37,3 +37,8 @@ train-response:
 
 train-uplift:
 	python -m src.models.train_uplift_model
+
+.PHONY: test-policy
+
+test-policy:
+	pytest tests/test_policy.py tests/test_budget_optimizer.py -q
