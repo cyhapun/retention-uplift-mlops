@@ -102,3 +102,37 @@ Run lint:
 ```bash
 make lint
 ```
+
+## Phase 1: Data Ingestion and Sampling
+
+The raw Criteo uplift dataset should be placed at:
+
+```text
+data/raw/criteo-uplift.csv
+```
+
+To build a small development dataset:
+
+```bash
+make data-sample
+```
+
+To build a larger MVP dataset:
+
+```bash
+make data
+```
+
+Generated files:
+
+```text
+data/interim/sample_100k.parquet
+data/interim/sample_1m.parquet
+data/processed/train.parquet
+data/processed/valid.parquet
+data/processed/test.parquet
+data/processed/dataset_summary.parquet
+data/reference/reference.parquet
+```
+
+The reference dataset will be used later for drift detection.
