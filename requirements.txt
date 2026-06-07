@@ -18,3 +18,5 @@ pyarrow
 ruff
 datasets
 tabulate
+ipykernel
+seaborn
