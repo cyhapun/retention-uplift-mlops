@@ -332,3 +332,82 @@ observed uplift by bucket
 Qini curve
 Qini/AUUC-style area metrics
 ```
+
+## Phase 5: Business Policy Engine
+
+This phase converts uplift predictions into business decisions.
+
+The uplift model from Phase 4 estimates:
+
+```text
+uplift_score = P(conversion | treatment = 1, features) - P(conversion | treatment = 0, features)
+```
+
+The policy engine converts this score into expected incremental value:
+
+```text
+expected_incremental_value = uplift_score * customer_value - treatment_cost
+```
+
+Actions
+
+The current policy supports:
+
+```text
+Action	Cost	Purpose
+no_action	0.0	Do not intervene
+low_cost_email	0.2	Low-cost intervention
+standard_discount	5.0	Medium-cost offer
+premium_offer	15.0	High-value intervention
+```
+
+Policy config
+
+Policy rules are configured in:
+
+```text
+src/policy/policy_config.yaml
+```
+
+Run policy tests:
+
+```text
+make test-policy
+```
+
+Or:
+
+```text
+pytest tests/test_policy.py tests/test_budget_optimizer.py -q
+```
+
+Example
+```text
+from src.policy.decision_engine import recommend_action_from_policy
+
+decision = recommend_action_from_policy(
+    uplift_score=0.12,
+    customer_value=100,
+)
+
+print(decision)
+```
+Example output:
+
+```text
+recommended_action: standard_discount
+expected_incremental_value: 7.0
+treatment_cost: 5.0
+```
+
+Why this matters
+
+A model score alone is not a business decision. The policy engine makes the project production-oriented by separating:
+
+ML prediction logic
+```text
+from
+business decision logic
+```
+
+This makes the system easier to test, audit, tune, and serve through the FastAPI service in later phases.
