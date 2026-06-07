@@ -229,3 +229,106 @@ artifacts/response_model.pkl
 ```
 
 MLflow logs each candidate model with params, metrics, and model artifacts under the response_model experiment.
+
+## Phase 4: T-Learner Uplift Model
+
+This phase trains a T-Learner uplift model to estimate the incremental effect of treatment.
+
+The uplift score is defined as:
+
+```text
+uplift_score = P(conversion | treatment = 1, features) - P(conversion | treatment = 0, features)
+```
+
+### Why this matters
+The baseline response model from Phase 3 predicts:
+
+```text
+P(conversion | features)
+```
+
+That is useful, but not enough for treatment decisioning.
+
+A user with high conversion probability may convert even without an intervention. The uplift model estimates whether the intervention changes the user's behavior.
+
+### T-Learner approach
+
+The T-Learner trains two separate outcome models:
+
+```text
+treatment_model: trained on treatment = 1 users
+control_model: trained on treatment = 0 users
+```
+
+At prediction time:
+
+```text
+treatment_probability = treatment_model.predict_proba(features)
+control_probability = control_model.predict_proba(features)
+uplift_score = treatment_probability - control_probability
+```
+
+### Run training
+
+Start MLflow UI:
+
+```text
+mlflow ui --host 0.0.0.0 --port 5000
+```
+
+Train uplift model:
+   
+```text
+make train-uplift
+```
+
+Or:
+
+```text
+python -m src.models.train_uplift_model
+```
+
+### Outputs
+
+Local generated artifacts:
+
+```text
+artifacts/uplift/treatment_model.pkl
+artifacts/uplift/control_model.pkl
+reports/uplift/valid_uplift_predictions.parquet
+reports/uplift/uplift_decile_report.csv
+reports/uplift/qini_curve.csv
+```
+
+MLflow experiment:
+
+```text
+uplift_model
+```
+
+Logged metrics include:
+
+```text
+treatment_model_roc_auc
+treatment_model_pr_auc
+treatment_model_log_loss
+control_model_roc_auc
+control_model_pr_auc
+control_model_log_loss
+mean_predicted_uplift
+share_positive_uplift
+qini_auc
+incremental_qini_auc
+top_decile_observed_uplift
+```
+
+### Evaluation note
+
+Uplift models cannot be evaluated only with standard classification metrics because each user has only one observed outcome. Therefore, this phase also uses uplift-specific diagnostics:
+
+```text
+uplift by decile
+observed uplift by bucket
+Qini curve
+Qini/AUUC-style area metrics
+```
