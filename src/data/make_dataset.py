@@ -1,5 +1,5 @@
 import argparse
-
+from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
@@ -99,10 +99,12 @@ def write_dataset_summary(
 
 
 def build_datasets(
-    raw_path=RAW_DATA_PATH,
+    raw_path: str | Path = RAW_DATA_PATH,
     read_rows: int | None = 1_000_000,
     train_sample_size: int = 1_000_000,
 ) -> None:
+    raw_path = Path(raw_path)
+
     INTERIM_DIR.mkdir(parents=True, exist_ok=True)
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
