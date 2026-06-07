@@ -12,6 +12,7 @@ class ActionConfig:
     cost: float
     min_expected_value: float
     min_uplift: float
+    priority: int
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,7 @@ def load_policy_config(path: str | Path = DEFAULT_POLICY_CONFIG_PATH) -> PolicyC
             cost=float(action_values["cost"]),
             min_expected_value=float(action_values["min_expected_value"]),
             min_uplift=float(action_values.get("min_uplift", 0.0)),
+            priority=int(action_values.get("priority", 0)),
         )
         for action_name, action_values in raw_config["actions"].items()
     }

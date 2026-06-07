@@ -3,21 +3,25 @@ actions:
     cost: 0.0
     min_expected_value: 0.0
     min_uplift: 0.0
+    priority: 0
 
   low_cost_email:
     cost: 0.2
     min_expected_value: 1.0
     min_uplift: 0.02
+    priority: 1
 
   standard_discount:
     cost: 5.0
     min_expected_value: 5.0
     min_uplift: 0.10
+    priority: 2
 
   premium_offer:
     cost: 15.0
     min_expected_value: 20.0
     min_uplift: 0.20
+    priority: 3
 
 thresholds:
   min_uplift_for_action: 0.02

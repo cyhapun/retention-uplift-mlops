@@ -130,6 +130,7 @@ def recommend_action_from_policy(
                 "expected_incremental_value": expected_value,
                 "roi": calculate_roi(expected_value, action_config.cost),
                 "recommended_action": action_name,
+                "action_priority": action_config.priority,
                 "decision_reason": [
                     "positive_uplift",
                     "positive_expected_value",
@@ -147,6 +148,7 @@ def recommend_action_from_policy(
 
     candidate_decisions.sort(
         key=lambda decision: (
+            decision["action_priority"],
             decision["expected_incremental_value"],
             decision["roi"],
         ),
