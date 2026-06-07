@@ -180,7 +180,11 @@ def split_data(
     assert_has_treatment_and_control(valid_df, dataset_name="valid_df")
     assert_has_treatment_and_control(test_df, dataset_name="test_df")
 
-    return train_df.reset_index(drop=True), valid_df.reset_index(drop=True), test_df.reset_index(drop=True)
+    return (
+        train_df.reset_index(drop=True),
+        valid_df.reset_index(drop=True),
+        test_df.reset_index(drop=True),
+    )
 
 
 def write_dataset_summary(
