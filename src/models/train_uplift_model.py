@@ -224,8 +224,14 @@ def train_uplift_model(experiment_name: str = "uplift_model") -> dict[str, objec
         mlflow.log_param("treatment_train_rows", len(treatment_train_df))
         mlflow.log_param("control_train_rows", len(control_train_df))
 
-        mlflow.log_metric("treatment_train_target_rate", float(treatment_train_df[target_col].mean()))
-        mlflow.log_metric("control_train_target_rate", float(control_train_df[target_col].mean()))
+        mlflow.log_metric(
+            "treatment_train_target_rate",
+            float(treatment_train_df[target_col].mean()),
+        )
+        mlflow.log_metric(
+            "control_train_target_rate",
+            float(control_train_df[target_col].mean()),
+        )
         mlflow.log_metric("valid_treatment_rate", float(valid_df[TREATMENT_COL].mean()))
 
         for metric_name, metric_value in treatment_metrics.items():
