@@ -32,3 +32,8 @@ data:
 
 train-response:
 	python -m src.models.train_response_model
+
+.PHONY: train-uplift
+
+train-uplift:
+	python -m src.models.train_uplift_model
