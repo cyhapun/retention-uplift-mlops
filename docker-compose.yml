@@ -1,0 +1,4 @@
+services:
+  placeholder:
+    image: alpine:latest
+    command: ["echo", "RetentionOps stack will be added in later phases"]
