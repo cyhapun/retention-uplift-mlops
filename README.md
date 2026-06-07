@@ -171,3 +171,61 @@ notebooks/01_data_exploration.ipynb
    - Features exhibit significant **skewness** (e.g., `f1`, `f4`, `f5` have extreme skew) and contain outliers.
    - Moderate to strong **multicollinearity** exists between certain feature pairs (e.g., `f5` and `f7`).
    - **Action**: **Tree-based models** (like XGBoost, LightGBM) are highly recommended as they naturally handle multicollinearity, non-linear relationships, and skewed features without requiring extensive scaling or transformations.
+
+## Phase 3: Baseline Response Model
+
+This phase trains standard binary classification models to predict:
+
+```text
+P(conversion | features)
+```
+
+This is not an uplift model yet. It is a baseline response model used for comparison before training the T-Learner uplift model.
+
+### Models
+
+Logistic Regression
+Random Forest
+XGBoost
+
+### Metrics
+
+ROC-AUC
+PR-AUC
+Log loss
+
+Because the target can be highly imbalanced, PR-AUC is used as the main model selection metric.
+
+### Run MLflow UI
+
+```text
+mlflow ui --host 0.0.0.0 --port 5000
+```
+
+Open:
+
+```text
+http://localhost:5000
+```
+
+### Train response models
+
+```text
+make train-response
+```
+
+Or:
+
+```text
+python -m src.models.train_response_model
+```
+
+### Output
+
+The best baseline response model is saved locally to:
+
+```text
+artifacts/response_model.pkl
+```
+
+MLflow logs each candidate model with params, metrics, and model artifacts under the response_model experiment.
