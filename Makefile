@@ -23,7 +23,7 @@ mlflow-ui:
 .PHONY: data-sample data
 
 data-sample:
-	python -m src.data.make_dataset --read-rows 100000 --train-sample-size 100000
+	python -m src.data.make_dataset --sample-size 100000 --chunk-size 500000
 
 data:
-	python -m src.data.make_dataset --read-rows 1000000 --train-sample-size 1000000
+	python -m src.data.make_dataset --sample-size 1000000 --chunk-size 500000

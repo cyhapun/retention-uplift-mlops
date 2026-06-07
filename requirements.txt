@@ -17,3 +17,6 @@ python-dotenv
 pyarrow
 ruff
 datasets
+tabulate
+ipykernel
+seaborn
