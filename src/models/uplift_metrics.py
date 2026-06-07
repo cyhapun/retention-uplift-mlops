@@ -48,7 +48,9 @@ def uplift_decile_report(
         duplicates="drop",
     )
 
-    def bucket_stats(group: pd.DataFrame) -> pd.Series:
+    rows = []
+
+    for decile, group in df.groupby("uplift_decile", observed=True):
         treatment_mask = group[TREATMENT_COL] == 1
         control_mask = group[TREATMENT_COL] == 0
 
@@ -66,8 +68,9 @@ def uplift_decile_report(
             else math.nan
         )
 
-        return pd.Series(
+        rows.append(
             {
+                "uplift_decile": int(decile),
                 "n_users": len(group),
                 "n_treatment": n_treatment,
                 "n_control": n_control,
@@ -80,7 +83,7 @@ def uplift_decile_report(
             }
         )
 
-    report = df.groupby("uplift_decile", observed=True).apply(bucket_stats).reset_index()
+    report = pd.DataFrame(rows)
 
     return report.sort_values("uplift_decile", ascending=False).reset_index(drop=True)
 
