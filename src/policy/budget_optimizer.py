@@ -72,7 +72,9 @@ def optimize_actions_for_budget(
             skipped_actions.append({**candidate, "skip_reason": "budget_exceeded"})
 
     no_action_candidates = [
-        candidate for candidate in scored_candidates if candidate["recommended_action"] == "no_action"
+        candidate
+        for candidate in scored_candidates
+        if candidate["recommended_action"] == "no_action"
     ]
 
     return {
