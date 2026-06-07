@@ -27,3 +27,8 @@ data-sample:
 
 data:
 	python -m src.data.make_dataset --sample-size 1000000 --chunk-size 500000
+
+.PHONY: train-response
+
+train-response:
+	python -m src.models.train_response_model
