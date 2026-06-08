@@ -50,3 +50,11 @@ register-uplift:
 
 test-registry:
 	python -c "import pandas as pd; from src.data.constants import FEATURE_COLS; from src.serving.model_loader import load_uplift_model; model=load_uplift_model(); X=pd.DataFrame([{f:0.0 for f in FEATURE_COLS}]); print(model.predict(X))"
+
+.PHONY: api test-api
+
+api:
+	uvicorn src.serving.main:app --host 0.0.0.0 --port 8000 --reload
+
+test-api:
+	pytest tests/test_api.py tests/test_schemas.py -q
