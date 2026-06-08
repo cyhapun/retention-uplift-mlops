@@ -186,3 +186,10 @@ ci-docker:
 	docker compose config
 	docker compose build api jobs
 	docker compose run --rm --no-deps jobs pytest tests -q
+
+.PHONY: docs-check portfolio-check
+
+docs-check:
+	python -c "from pathlib import Path; required=['README.md','docs/architecture.md','docs/demo.md','docs/api_examples.md','docs/troubleshooting.md','docs/project_summary.md','docs/modeling_notes.md','docs/mlops_lifecycle.md']; missing=[p for p in required if not Path(p).exists()]; assert not missing, f'Missing docs: {missing}'; print('Documentation files exist.')"
+
+portfolio-check: ci docs-check
