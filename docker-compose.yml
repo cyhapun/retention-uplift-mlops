@@ -1,4 +1,21 @@
 services:
+  postgres:
+    image: postgres:16
+    container_name: retentionops-postgres
+    environment:
+      POSTGRES_USER: retentionops
+      POSTGRES_PASSWORD: retentionops
+      POSTGRES_DB: retentionops
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U retentionops -d retentionops"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   mlflow:
     build:
       context: .
@@ -12,7 +29,6 @@ services:
       --backend-store-uri sqlite:////app/mlflow.db
       --default-artifact-root file:///app/mlruns
       --allowed-hosts localhost,127.0.0.1,mlflow,mlflow:5000,0.0.0.0
-      --cors-allowed-origins http://localhost:5000,http://127.0.0.1:5000,http://mlflow:5000
     ports:
       - "5000:5000"
     volumes:
@@ -40,8 +56,13 @@ services:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       UPLIFT_MODEL_NAME: uplift_model
       UPLIFT_MODEL_ALIAS: champion
+      DATABASE_URL: postgresql+psycopg2://retentionops:retentionops@postgres:5432/retentionops
+      ENABLE_DECISION_LOGGING: "true"
     depends_on:
-      - mlflow
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
 
   jobs:
     build:
@@ -59,5 +80,13 @@ services:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       UPLIFT_MODEL_NAME: uplift_model
       UPLIFT_MODEL_ALIAS: champion
+      DATABASE_URL: postgresql+psycopg2://retentionops:retentionops@postgres:5432/retentionops
+      ENABLE_DECISION_LOGGING: "true"
     depends_on:
-      - mlflow
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+
+volumes:
+  postgres_data:
