@@ -987,3 +987,106 @@ Which logged decisions can be used for future retraining?
 ```
 
 This phase prepares the project for retraining and model lifecycle automation.
+
+## Phase 12: Full Docker Compose Stack
+
+This phase finalizes the local Docker Compose stack for RetentionOps.
+
+### Services
+
+| Service | URL | Purpose |
+|---|---|---|
+| PostgreSQL | `localhost:5432` | Decision and feedback logs |
+| MLflow | `http://localhost:5000` | Tracking and Model Registry |
+| FastAPI | `http://localhost:8000/docs` | Decision API |
+| Prometheus | `http://localhost:9090` | Metrics scraping |
+| Grafana | `http://localhost:3000` | Monitoring dashboard |
+| Jobs | n/a | One-off training, registration, drift, feedback jobs |
+
+### First-time setup
+
+Create local environment file:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Build images:
+
+```powershell
+docker compose build
+```
+
+If processed data already exists:
+
+```powershell
+.\scripts\docker-bootstrap.ps1 -Train -Monitoring
+```
+
+If processed data needs to be generated:
+
+```powershell
+.\scripts\docker-bootstrap.ps1 -BuildData -Train -Monitoring
+```
+### Regular startup
+
+If model has already been trained and registered:
+
+```powershell
+docker compose up -d postgres mlflow api prometheus grafana
+```
+
+### Smoke test
+
+```powershell
+.\scripts\docker-smoke-test.ps1
+```
+Useful commands
+### Useful commands
+
+```powershell
+docker compose ps
+docker compose logs -f
+docker compose logs -f api
+docker compose logs -f mlflow
+docker compose down
+docker compose down -v
+```
+
+### URLs
+
+```text
+MLflow:       http://localhost:5000
+FastAPI docs: http://localhost:8000/docs
+Prometheus:   http://localhost:9090
+Grafana:      http://localhost:3000
+```
+
+Grafana login:
+
+```text
+username: admin
+password: admin
+```
+
+### Important note
+
+When using Docker, train and register the uplift model inside the jobs container:
+
+```powershell
+docker compose run --rm jobs python -m src.models.train_uplift_model
+docker compose run --rm jobs python -m src.models.register_uplift_model
+```
+
+This keeps MLflow artifact paths consistent across containers.
+
+Generated runtime files are not committed:
+
+```text
+mlflow.db
+mlruns/
+artifacts/
+reports/
+data/processed/
+Docker volumes
+```

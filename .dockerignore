@@ -19,6 +19,7 @@ artifacts/
 reports/
 mlruns/
 mlflow.db
+retentionops.db
 
 .ipynb_checkpoints/
 .vscode/
