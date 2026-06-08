@@ -491,3 +491,125 @@ Name: uplift_model
 Alias: champion
 URI: models:/uplift_model@champion
 ```
+
+## Phase 7: FastAPI Decision Service
+
+This phase exposes the uplift model and policy engine through a REST API.
+
+The API flow is:
+
+```text
+Request features
+→ Load uplift model from MLflow Registry
+→ Predict treatment probability
+→ Predict control probability
+→ Calculate uplift score
+→ Apply business policy
+→ Return recommended action
+```
+
+### Start MLflow
+
+```bash
+mlflow ui --backend-store-uri sqlite:///mlflow.db --host 0.0.0.0 --port 5000
+```
+
+### Set tracking URI
+
+```bash
+$env:MLFLOW_TRACKING_URI="http://localhost:5000"
+```
+
+### Run API
+
+```bash
+make api
+```
+
+Or:
+
+```bash
+uvicorn src.serving.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Open Swagger UI
+
+```text
+http://localhost:8000/docs
+```
+
+### Open ReDoc
+
+```text
+http://localhost:8000/redoc
+```
+
+### Endpoints
+
+http://localhost:8000/redoc
+
+```text
+Endpoints
+Method	Endpoint	Purpose
+GET	/health	Health check
+GET	/model-info	Current model name, alias, and URI
+POST	/decide-action	Predict uplift and recommend action
+```
+
+### Example request
+
+```text
+{
+  "user_id": "user_001",
+  "customer_value": 100,
+  "features": {
+    "f0": 0.0,
+    "f1": 0.0,
+    "f2": 0.0,
+    "f3": 0.0,
+    "f4": 0.0,
+    "f5": 0.0,
+    "f6": 0.0,
+    "f7": 0.0,
+    "f8": 0.0,
+    "f9": 0.0,
+    "f10": 0.0
+  }
+}
+```
+
+### Example response
+
+```text
+{
+  "user_id": "user_001",
+  "treatment_probability": 0.25,
+  "control_probability": 0.10,
+  "uplift_score": 0.15,
+  "customer_value": 100.0,
+  "treatment_cost": 5.0,
+  "expected_incremental_value": 10.0,
+  "roi": 2.0,
+  "recommended_action": "standard_discount",
+  "decision_reason": [
+    "positive_uplift",
+    "positive_expected_value",
+    "action_threshold_met"
+  ],
+  "model_name": "uplift_model",
+  "model_alias": "champion",
+  "model_version": "..."
+}
+```
+
+### Test API
+
+```bash
+make test-api
+```
+
+Or:
+
+```bash
+pytest tests/test_api.py tests/test_schemas.py -q
+```
