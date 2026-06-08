@@ -21,3 +21,4 @@ tabulate
 ipykernel
 seaborn
 pyyaml
+httpx
