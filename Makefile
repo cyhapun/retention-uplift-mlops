@@ -59,25 +59,16 @@ api:
 test-api:
 	pytest tests/test_api.py tests/test_schemas.py -q
 
-.PHONY: docker-build docker-mlflow docker-api docker-down docker-logs docker-data-sample docker-train-uplift docker-register-uplift docker-test-registry docker-test-api docker-shell
+.PHONY: docker-build docker-up-infra docker-init-db docker-train-uplift docker-register-uplift docker-up-api docker-up-monitoring docker-stack docker-smoke docker-logs docker-down docker-clean docker-shell
 
 docker-build:
 	docker compose build
 
-docker-mlflow:
-	docker compose up -d mlflow
+docker-up-infra:
+	docker compose up -d postgres mlflow
 
-docker-api:
-	docker compose up -d api
-
-docker-down:
-	docker compose down
-
-docker-logs:
-	docker compose logs -f
-
-docker-data-sample:
-	docker compose run --rm jobs python -m src.data.make_dataset --sample-size 100000 --chunk-size 500000
+docker-init-db:
+	docker compose run --rm jobs python -m src.db.init_db
 
 docker-train-uplift:
 	docker compose run --rm jobs python -m src.models.train_uplift_model
@@ -85,11 +76,26 @@ docker-train-uplift:
 docker-register-uplift:
 	docker compose run --rm jobs python -m src.models.register_uplift_model
 
-docker-test-registry:
-	docker compose run --rm jobs python -c "import pandas as pd; from src.data.constants import FEATURE_COLS; from src.serving.model_loader import load_uplift_model; model=load_uplift_model(); X=pd.DataFrame([{f:0.0 for f in FEATURE_COLS}]); print(model.predict(X))"
+docker-up-api:
+	docker compose up -d api
 
-docker-test-api:
-	docker compose run --rm jobs pytest tests/test_api.py tests/test_schemas.py -q
+docker-up-monitoring:
+	docker compose up -d prometheus grafana
+
+docker-stack:
+	docker compose up -d postgres mlflow api prometheus grafana
+
+docker-smoke:
+	powershell -ExecutionPolicy Bypass -File scripts/docker-smoke-test.ps1
+
+docker-logs:
+	docker compose logs -f
+
+docker-down:
+	docker compose down
+
+docker-clean:
+	docker compose down -v
 
 docker-shell:
 	docker compose run --rm jobs bash
@@ -168,3 +174,4 @@ docker-simulate-feedback:
 
 docker-feedback-summary:
 	docker compose exec postgres psql -U retentionops -d retentionops -c "SELECT d.recommended_action, COUNT(f.feedback_id) AS n_feedback, AVG(f.observed_outcome) AS observed_outcome_rate, SUM(f.realized_value) AS total_realized_value FROM feedback_logs f JOIN decision_logs d ON d.decision_id = f.decision_id GROUP BY d.recommended_action ORDER BY n_feedback DESC;"
+	
