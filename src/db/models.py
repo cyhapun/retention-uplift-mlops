@@ -1,8 +1,9 @@
-from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, JSON, String
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from src.db.database import Base
+
 
 class DecisionLog(Base):
     __tablename__ = "decision_logs"
