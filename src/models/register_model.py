@@ -12,8 +12,8 @@ DEFAULT_TRACKING_URI = "sqlite:///mlflow.db"
 DEFAULT_MODEL_NAME = "uplift_model"
 DEFAULT_ALIAS = "champion"
 
-TREATMENT_MODEL_PATH = Path("artifacts/treatment_model.pkl")
-CONTROL_MODEL_PATH = Path("artifacts/control_model.pkl")
+TREATMENT_MODEL_PATH = Path("artifacts/uplift/treatment_model.pkl")
+CONTROL_MODEL_PATH = Path("artifacts/uplift/control_model.pkl")
 VALID_DATA_PATH = Path("data/processed/valid.parquet")
 
 
