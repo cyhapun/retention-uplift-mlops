@@ -8,6 +8,7 @@ class DecisionRequest(BaseModel):
 
 
 class DecisionResponse(BaseModel):
+    decision_id: str
     user_id: str
     treatment_probability: float
     control_probability: float

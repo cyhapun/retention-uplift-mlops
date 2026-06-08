@@ -17,9 +17,7 @@ DEFAULT_ALIAS = "champion"
 
 def validate_artifact_paths(treatment_model_path: Path, control_model_path: Path) -> None:
     missing_paths = [
-        path
-        for path in [treatment_model_path, control_model_path]
-        if not path.exists()
+        path for path in [treatment_model_path, control_model_path] if not path.exists()
     ]
 
     if missing_paths:
@@ -68,13 +66,8 @@ def register_uplift_model(
         model_version = model_info.registered_model_version
 
         if model_version is None:
-            latest_versions = client.search_model_versions(
-                f"name = '{registered_model_name}'"
-            )
-            model_version = max(
-                int(version.version)
-                for version in latest_versions
-            )
+            latest_versions = client.search_model_versions(f"name = '{registered_model_name}'")
+            model_version = max(int(version.version) for version in latest_versions)
 
         client.set_registered_model_alias(
             name=registered_model_name,

@@ -71,7 +71,7 @@ def test_decide_action_endpoint_returns_decision():
     assert body["expected_incremental_value"] == 10.0
     assert body["model_name"] == "uplift_model"
     assert body["model_alias"] == "champion"
-
+    assert "decision_id" in body
 
 def test_decide_action_endpoint_rejects_missing_features():
     app = create_app(model=FakeUpliftModel())

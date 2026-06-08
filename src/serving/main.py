@@ -1,10 +1,15 @@
+import os
 from contextlib import asynccontextmanager
 from typing import Any
+from uuid import uuid4
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 
 from src.data.constants import FEATURE_COLS
+from src.db.database import SessionLocal, init_database
+from src.db.repository import create_decision_log
 from src.policy.decision_engine import recommend_action_from_policy
 from src.serving.model_loader import (
     DEFAULT_MODEL_ALIAS,
@@ -20,6 +25,13 @@ from src.serving.schemas import (
 )
 
 
+def parse_bool(value: str | None, default: bool = True) -> bool:
+    if value is None:
+        return default
+
+    return value.lower() in {"1", "true", "yes", "y"}
+
+
 def validate_features(features: dict[str, float]) -> pd.DataFrame:
     missing_features = [feature for feature in FEATURE_COLS if feature not in features]
 
@@ -32,9 +44,7 @@ def validate_features(features: dict[str, float]) -> pd.DataFrame:
             },
         )
 
-    feature_df = pd.DataFrame([{feature: float(features[feature]) for feature in FEATURE_COLS}])
-
-    return feature_df
+    return pd.DataFrame([{feature: float(features[feature]) for feature in FEATURE_COLS}])
 
 
 def get_model_version(model: Any) -> str:
@@ -51,9 +61,23 @@ def get_model_version(model: Any) -> str:
     return str(run_id)
 
 
-def create_app(model: Any | None = None) -> FastAPI:
+def create_app(
+    model: Any | None = None,
+    enable_decision_logging: bool | None = None,
+) -> FastAPI:
+    if enable_decision_logging is None:
+        enable_decision_logging = parse_bool(
+            os.getenv("ENABLE_DECISION_LOGGING"),
+            default=True,
+        )
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        app.state.enable_decision_logging = enable_decision_logging
+
+        if app.state.enable_decision_logging:
+            init_database()
+
         if model is not None:
             app.state.model = model
         else:
@@ -91,6 +115,7 @@ def create_app(model: Any | None = None) -> FastAPI:
         if not hasattr(app.state, "model"):
             raise HTTPException(status_code=503, detail="Model is not loaded.")
 
+        decision_id = str(uuid4())
         feature_df = validate_features(request.features)
 
         prediction = app.state.model.predict(feature_df).iloc[0]
@@ -104,7 +129,10 @@ def create_app(model: Any | None = None) -> FastAPI:
             customer_value=request.customer_value,
         )
 
-        return DecisionResponse(
+        model_version = get_model_version(app.state.model)
+
+        response = DecisionResponse(
+            decision_id=decision_id,
             user_id=request.user_id,
             treatment_probability=treatment_probability,
             control_probability=control_probability,
@@ -117,8 +145,37 @@ def create_app(model: Any | None = None) -> FastAPI:
             decision_reason=list(decision["decision_reason"]),
             model_name=DEFAULT_MODEL_NAME,
             model_alias=DEFAULT_MODEL_ALIAS,
-            model_version=get_model_version(app.state.model),
+            model_version=model_version,
         )
+
+        if app.state.enable_decision_logging:
+            try:
+                with SessionLocal() as session:
+                    create_decision_log(
+                        session=session,
+                        decision_id=response.decision_id,
+                        user_id=response.user_id,
+                        features=request.features,
+                        treatment_probability=response.treatment_probability,
+                        control_probability=response.control_probability,
+                        uplift_score=response.uplift_score,
+                        customer_value=response.customer_value,
+                        treatment_cost=response.treatment_cost,
+                        expected_incremental_value=response.expected_incremental_value,
+                        roi=response.roi,
+                        recommended_action=response.recommended_action,
+                        decision_reason=response.decision_reason,
+                        model_name=response.model_name,
+                        model_alias=response.model_alias,
+                        model_version=response.model_version,
+                    )
+            except SQLAlchemyError as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Failed to log decision: {exc}",
+                ) from exc
+
+        return response
 
     return app
 

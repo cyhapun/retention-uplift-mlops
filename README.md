@@ -655,3 +655,84 @@ docker compose logs -f api
 docker compose logs -f mlflow
 docker compose down
 ```
+
+## Phase 8: PostgreSQL Decision Logging
+
+This phase logs each API decision to PostgreSQL.
+
+When `/decide-action` is called, the API stores:
+
+```text
+decision_id
+user_id
+features
+treatment_probability
+control_probability
+uplift_score
+customer_value
+treatment_cost
+expected_incremental_value
+roi
+recommended_action
+decision_reason
+model_name
+model_alias
+model_version
+created_at
+
+### Start services
+
+```bash
+docker compose up -d postgres mlflow
+```
+
+### Initialize database
+
+```bash
+docker compose run --rm jobs python -m src.db.init_db
+```
+
+### Start API
+
+```bash
+docker compose up -d api
+```
+
+### Query decision logs
+
+```bash
+docker compose exec postgres psql -U retentionops -d retentionops
+```
+```
+
+```sql
+SELECT COUNT(*) FROM decision_logs;
+
+SELECT
+  decision_id,
+  user_id,
+  uplift_score,
+  expected_incremental_value,
+  recommended_action,
+  created_at
+FROM decision_logs
+ORDER BY created_at DESC
+LIMIT 5;
+
+SELECT recommended_action, COUNT(*)
+FROM decision_logs
+GROUP BY recommended_action
+ORDER BY COUNT(*) DESC;
+```
+
+### Why this matters
+
+Decision logging makes the system auditable and production-oriented.
+
+The logs will be used later for:
+
+monitoring action distribution
+tracking average uplift score
+simulating delayed feedback
+evaluating model decisions
+triggering retraining

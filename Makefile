@@ -93,3 +93,24 @@ docker-test-api:
 
 docker-shell:
 	docker compose run --rm jobs bash
+
+
+.PHONY: init-db docker-postgres docker-init-db docker-psql docker-db-logs test-db
+
+init-db:
+	python -m src.db.init_db
+
+test-db:
+	pytest tests/test_decision_logging.py -q
+
+docker-postgres:
+	docker compose up -d postgres
+
+docker-init-db:
+	docker compose run --rm jobs python -m src.db.init_db
+
+docker-psql:
+	docker compose exec postgres psql -U retentionops -d retentionops
+
+docker-db-logs:
+	docker compose logs -f postgres
