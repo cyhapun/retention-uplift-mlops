@@ -84,3 +84,14 @@ def test_decide_action_endpoint_rejects_missing_features():
     assert response.status_code == 400
     assert response.json()["detail"]["message"] == "Missing required features."
     assert response.json()["detail"]["missing_features"] == ["f0"]
+
+def test_metrics_endpoint_returns_prometheus_payload():
+    app = create_app(model=FakeUpliftModel(), enable_decision_logging=False)
+
+    with TestClient(app) as client:
+        client.get("/health")
+        response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "text/plain" in response.headers["content-type"]
+    assert "retentionops_api_requests_total" in response.text
