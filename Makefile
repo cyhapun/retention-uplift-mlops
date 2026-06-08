@@ -114,3 +114,20 @@ docker-psql:
 
 docker-db-logs:
 	docker compose logs -f postgres
+
+.PHONY: docker-monitoring docker-prometheus docker-grafana docker-monitoring-logs test-metrics
+
+test-metrics:
+	pytest tests/test_metrics.py tests/test_api.py -q
+
+docker-prometheus:
+	docker compose up -d prometheus
+
+docker-grafana:
+	docker compose up -d grafana
+
+docker-monitoring:
+	docker compose up -d prometheus grafana
+
+docker-monitoring-logs:
+	docker compose logs -f prometheus grafana

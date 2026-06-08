@@ -11,6 +11,7 @@ from src.data.constants import FEATURE_COLS
 from src.db.database import SessionLocal, init_database
 from src.db.repository import create_decision_log
 from src.policy.decision_engine import recommend_action_from_policy
+from src.serving.metrics import metrics_response, prometheus_middleware, record_decision_metrics
 from src.serving.model_loader import (
     DEFAULT_MODEL_ALIAS,
     DEFAULT_MODEL_NAME,
@@ -91,6 +92,8 @@ def create_app(
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    app.middleware("http")(prometheus_middleware)
 
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
@@ -175,7 +178,17 @@ def create_app(
                     detail=f"Failed to log decision: {exc}",
                 ) from exc
 
+        record_decision_metrics(
+            recommended_action=response.recommended_action,
+            uplift_score=response.uplift_score,
+            expected_incremental_value=response.expected_incremental_value,
+        )
+
         return response
+
+    @app.get("/metrics")
+    def metrics():
+        return metrics_response()
 
     return app
 
