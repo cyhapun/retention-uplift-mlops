@@ -84,3 +84,13 @@ def test_decide_action_endpoint_rejects_missing_features():
     assert response.status_code == 400
     assert response.json()["detail"]["message"] == "Missing required features."
     assert response.json()["detail"]["missing_features"] == ["f0"]
+
+
+def test_health_endpoint_returns_ok():
+    app = create_app(model=FakeUpliftModel(), enable_decision_logging=False)
+
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
