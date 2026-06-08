@@ -1,0 +1,30 @@
+flowchart TD
+    A[Raw Criteo Uplift CSV] --> B[Data Ingestion Pipeline]
+    B --> C[Processed Train / Valid / Test]
+    B --> D[Reference Dataset]
+
+    C --> E[EDA and Problem Framing]
+    C --> F[Baseline Response Model]
+    C --> G[T-Learner Uplift Model]
+
+    G --> H[MLflow Tracking]
+    G --> I[MLflow Model Registry]
+    I --> J[Registered Model: uplift_model@champion]
+
+    J --> K[FastAPI Decision Service]
+    K --> L[Policy Engine]
+    L --> M[Recommended Action]
+
+    K --> N[PostgreSQL Decision Logs]
+    N --> O[Delayed Feedback Simulation]
+    O --> P[Feedback Logs]
+
+    K --> Q[Prometheus Metrics]
+    Q --> R[Grafana Dashboard]
+
+    D --> S[Evidently Drift Detection]
+    C --> S
+    S --> T[Retraining Signal]
+
+    U[GitHub Actions CI] --> V[Lint / Test / Docker Build]
+    W[Docker Compose] --> X[Local MLOps Stack]
