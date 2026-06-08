@@ -1,15 +1,10 @@
-from src.serving.model_loader import get_model_uri
+from src.serving.model_loader import build_model_uri
 
 
-def test_get_model_uri_default(monkeypatch):
-    monkeypatch.delenv("UPLIFT_MODEL_NAME", raising=False)
-    monkeypatch.delenv("UPLIFT_MODEL_ALIAS", raising=False)
+def test_build_model_uri_uses_name_and_alias():
+    uri = build_model_uri(
+        model_name="uplift_model",
+        model_alias="champion",
+    )
 
-    assert get_model_uri() == "models:/uplift_model@champion"
-
-
-def test_get_model_uri_from_env(monkeypatch):
-    monkeypatch.setenv("UPLIFT_MODEL_NAME", "test_model")
-    monkeypatch.setenv("UPLIFT_MODEL_ALIAS", "staging")
-
-    assert get_model_uri() == "models:/test_model@staging"
+    assert uri == "models:/uplift_model@champion"
