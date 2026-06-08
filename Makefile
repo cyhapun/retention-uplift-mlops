@@ -131,3 +131,26 @@ docker-monitoring:
 
 docker-monitoring-logs:
 	docker compose logs -f prometheus grafana
+
+.PHONY: simulate-drift drift-report drift-report-drifted test-drift docker-simulate-drift docker-drift-report docker-drift-report-drifted
+
+simulate-drift:
+	python -m src.monitoring.simulate_drift
+
+drift-report:
+	python -m src.monitoring.drift_report --current-path data/processed/test.parquet --report-name data_drift_report
+
+drift-report-drifted:
+	python -m src.monitoring.drift_report --current-path data/processed/test_drifted.parquet --report-name data_drift_report_drifted
+
+test-drift:
+	pytest tests/test_drift_simulation.py tests/test_retrain_check.py tests/test_drift_report.py -q
+
+docker-simulate-drift:
+	docker compose run --rm jobs python -m src.monitoring.simulate_drift
+
+docker-drift-report:
+	docker compose run --rm jobs python -m src.monitoring.drift_report --current-path data/processed/test.parquet --report-name data_drift_report
+
+docker-drift-report-drifted:
+	docker compose run --rm jobs python -m src.monitoring.drift_report --current-path data/processed/test_drifted.parquet --report-name data_drift_report_drifted

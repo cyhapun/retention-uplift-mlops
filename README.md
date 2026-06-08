@@ -827,3 +827,76 @@ Which actions are being recommended most often?
 Is uplift score distribution changing?
 Is expected value still positive?
 ```
+
+## Phase 10: Drift Detection with Evidently
+
+This phase compares reference data against current or simulated production data to detect data drift.
+
+Reference data:
+
+```text
+data/reference/reference.parquet
+```
+
+Current data:
+
+```text
+data/processed/test.parquet
+```
+
+Simulated drifted data:
+
+```text
+data/processed/test_drifted.parquet
+```
+
+Run normal drift report
+
+```bash
+docker compose run --rm jobs python -m src.monitoring.drift_report --current-path data/processed/test.parquet --report-name data_drift_report
+```
+
+Create simulated drift
+
+```bash
+docker compose run --rm jobs python -m src.monitoring.simulate_drift
+```
+
+Run drifted report
+
+```bash
+docker compose run --rm jobs python -m src.monitoring.drift_report --current-path data/processed/test_drifted.parquet --report-name data_drift_report_drifted
+```
+
+Outputs
+
+```text
+reports/drift/data_drift_report_summary.json
+reports/drift/data_drift_report_features.csv
+reports/drift/data_drift_report_drifted_summary.json
+reports/drift/data_drift_report_drifted_features.csv
+```
+
+If supported by the installed Evidently version, HTML reports are also generated:
+
+```text
+reports/drift/data_drift_report.html
+reports/drift/data_drift_report_drifted.html
+```
+
+Why this matters
+
+Drift detection helps answer:
+
+```text
+Is production data still similar to training/reference data?
+Are important features shifting?
+Should we investigate or retrain the model?
+```
+
+This phase produces a retraining signal:
+
+```text
+should_retrain: true / false
+retrain_reasons: [...]
+``` 
