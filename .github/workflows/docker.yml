@@ -1,0 +1,46 @@
+name: Docker CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+      - "feature/**"
+      - "fix/**"
+      - "chore/**"
+
+permissions:
+  contents: read
+
+jobs:
+  docker-validation:
+    name: Docker compose validation
+    runs-on: ubuntu-latest
+
+    env:
+      PYTHONPATH: /app
+      ENABLE_DECISION_LOGGING: "false"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show Docker versions
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Validate Docker Compose config
+        run: docker compose config
+
+      - name: Build Docker images
+        run: docker compose build api jobs
+
+      - name: Run tests inside jobs container
+        run: docker compose run --rm --no-deps jobs pytest tests -q
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v
