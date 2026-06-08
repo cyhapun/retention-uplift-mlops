@@ -736,3 +736,94 @@ tracking average uplift score
 simulating delayed feedback
 evaluating model decisions
 triggering retraining
+
+## Phase 9: Prometheus Metrics and Grafana Dashboard
+
+This phase adds monitoring for the FastAPI decision service.
+
+The API exposes Prometheus metrics at:
+
+```text
+/metrics
+Metrics
+Metric	Purpose
+retentionops_api_requests_total	API request count
+retentionops_api_errors_total	API error count
+retentionops_api_latency_seconds	API latency histogram
+retentionops_recommended_action_total	Recommended action distribution
+retentionops_uplift_score	Uplift score distribution
+retentionops_expected_incremental_value	Expected value distribution
+```
+
+### Start monitoring stack
+
+```bash
+docker compose up -d postgres mlflow api prometheus grafana
+```
+
+### URLs
+
+```text
+FastAPI docs: http://localhost:8000/docs
+Metrics: http://localhost:8000/metrics
+Prometheus: http://localhost:9090
+Grafana: http://localhost:3000
+```
+
+#### Grafana login
+
+```text
+username: admin
+password: admin
+```
+
+### Prometheus target
+
+In Prometheus:
+```text
+Status → Targets
+```
+
+Expected target:
+
+```text
+retentionops-api UP
+```
+
+### Grafana dashboard
+
+Dashboard path:
+
+```text
+Dashboards → RetentionOps → RetentionOps Monitoring
+```
+
+### Panels
+```text
+API Requests per Second
+API p95 Latency
+API Error Rate
+Recommended Action Distribution
+Average Uplift Score
+Average Expected Incremental Value
+Generate traffic
+1..20 | ForEach-Object {
+  Invoke-RestMethod `
+    -Uri "http://localhost:8000/decide-action" `
+    -Method Post `
+    -Body $body `
+    -ContentType "application/json"
+}
+```
+
+### Why this matters
+
+Monitoring makes the decision service observable. It helps answer:
+```text
+Is the API healthy?
+Is latency increasing?
+Are errors happening?
+Which actions are being recommended most often?
+Is uplift score distribution changing?
+Is expected value still positive?
+```
