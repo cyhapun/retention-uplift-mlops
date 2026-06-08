@@ -6,12 +6,7 @@ from src.monitoring.simulate_drift import simulate_feature_drift
 
 
 def test_simulate_feature_drift_changes_expected_features():
-    df = pd.DataFrame(
-        {
-            feature: [1.0, 2.0, 3.0]
-            for feature in FEATURE_COLS
-        }
-    )
+    df = pd.DataFrame({feature: [1.0, 2.0, 3.0] for feature in FEATURE_COLS})
 
     drifted_df = simulate_feature_drift(df)
 

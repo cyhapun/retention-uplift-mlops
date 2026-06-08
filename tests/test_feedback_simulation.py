@@ -49,11 +49,14 @@ def test_get_simulated_outcome_probability_uses_treatment_for_action():
 
 
 def test_calculate_realized_value_subtracts_treatment_cost():
-    assert calculate_realized_value(
-        observed_outcome=1,
-        customer_value=100,
-        treatment_cost=5,
-    ) == 95
+    assert (
+        calculate_realized_value(
+            observed_outcome=1,
+            customer_value=100,
+            treatment_cost=5,
+        )
+        == 95
+    )
 
 
 def test_simulate_binary_outcome_clips_probability():

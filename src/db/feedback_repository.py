@@ -75,7 +75,9 @@ def get_feedback_summary_by_action(session: Session) -> list[dict]:
             DecisionLog.recommended_action,
             func.count(FeedbackLog.feedback_id).label("n_feedback"),
             func.avg(FeedbackLog.observed_outcome).label("observed_outcome_rate"),
-            func.avg(DecisionLog.expected_incremental_value).label("avg_expected_incremental_value"),
+            func.avg(DecisionLog.expected_incremental_value).label(
+                "avg_expected_incremental_value"
+            ),
             func.sum(FeedbackLog.realized_value).label("total_realized_value"),
             func.sum(DecisionLog.treatment_cost).label("total_treatment_cost"),
         )
