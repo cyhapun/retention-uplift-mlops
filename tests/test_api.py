@@ -73,6 +73,7 @@ def test_decide_action_endpoint_returns_decision():
     assert body["model_alias"] == "champion"
     assert "decision_id" in body
 
+
 def test_decide_action_endpoint_rejects_missing_features():
     app = create_app(model=FakeUpliftModel())
     payload = make_payload()
@@ -84,6 +85,7 @@ def test_decide_action_endpoint_rejects_missing_features():
     assert response.status_code == 400
     assert response.json()["detail"]["message"] == "Missing required features."
     assert response.json()["detail"]["missing_features"] == ["f0"]
+
 
 def test_metrics_endpoint_returns_prometheus_payload():
     app = create_app(model=FakeUpliftModel(), enable_decision_logging=False)

@@ -62,7 +62,9 @@ async def prometheus_middleware(request: Request, call_next: Callable) -> Respon
     except Exception:
         ERROR_COUNT.labels(method=method, endpoint=endpoint).inc()
         REQUEST_COUNT.labels(method=method, endpoint=endpoint, http_status="500").inc()
-        REQUEST_LATENCY.labels(method=method, endpoint=endpoint).observe(perf_counter() - start_time)
+        REQUEST_LATENCY.labels(method=method, endpoint=endpoint).observe(
+            perf_counter() - start_time
+        )
         raise
 
     status_code = str(response.status_code)

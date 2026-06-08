@@ -11,6 +11,7 @@ from src.data.constants import FEATURE_COLS
 from src.db.database import SessionLocal, init_database
 from src.db.repository import create_decision_log
 from src.policy.decision_engine import recommend_action_from_policy
+from src.serving.metrics import metrics_response, prometheus_middleware, record_decision_metrics
 from src.serving.model_loader import (
     DEFAULT_MODEL_ALIAS,
     DEFAULT_MODEL_NAME,
@@ -24,7 +25,6 @@ from src.serving.schemas import (
     ModelInfoResponse,
 )
 
-from src.serving.metrics import metrics_response, prometheus_middleware, record_decision_metrics
 
 def parse_bool(value: str | None, default: bool = True) -> bool:
     if value is None:
@@ -71,7 +71,7 @@ def create_app(
             os.getenv("ENABLE_DECISION_LOGGING"),
             default=True,
         )
-    
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.enable_decision_logging = enable_decision_logging
@@ -185,7 +185,7 @@ def create_app(
         )
 
         return response
-    
+
     @app.get("/metrics")
     def metrics():
         return metrics_response()
