@@ -613,3 +613,45 @@ Or:
 ```bash
 pytest tests/test_api.py tests/test_schemas.py -q
 ```
+
+## Docker Development Workflow
+
+To avoid running MLflow, model registration, and FastAPI manually in multiple terminals, use the Docker Compose dev stack.
+
+### Services
+
+| Service | Purpose |
+|---|---|
+| `mlflow` | MLflow Tracking and Model Registry |
+| `api` | FastAPI decision service |
+| `jobs` | One-off commands for training, registration, and tests |
+
+### First run
+
+If processed data already exists:
+
+```powershell
+.\scripts\docker-dev.ps1 -Train
+```
+
+If data also needs to be generated:
+
+```powershell
+.\scripts\docker-dev.ps1 -BuildData -Train
+```
+
+Regular run
+```bash
+docker compose up -d mlflow api
+```
+URLs
+MLflow: http://localhost:5000
+API docs: http://localhost:8000/docs
+Health: http://localhost:8000/health
+Useful commands
+```bash
+docker compose logs -f
+docker compose logs -f api
+docker compose logs -f mlflow
+docker compose down
+```
