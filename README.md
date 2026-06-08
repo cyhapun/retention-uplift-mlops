@@ -414,31 +414,16 @@ This makes the system easier to test, audit, tune, and serve through the FastAPI
 
 ## Phase 6: MLflow Model Registry
 
-The uplift model is packaged as a custom MLflow PyFunc model and registered in the MLflow Model Registry.
+This phase registers the T-Learner uplift model as a single MLflow PyFunc model.
 
-The production uplift model is not loaded from hard-coded local pickle paths. Instead, the API loads the model by registry alias:
-
-```text
-models:/uplift_model@champion
-```
-
-This makes the serving layer more production-like because model versions can be promoted, rolled back, or replaced without changing the API code.
-
-### Model Packaging
-
-The uplift model uses a T-Learner architecture with two component models:
+The registered model wraps two artifacts:
 
 ```text
-Treatment model:
-P(conversion | treatment = 1, features)
-
-Control model:
-P(conversion | treatment = 0, features)
+treatment_model.pkl
+control_model.pkl
 ```
 
-A custom `UpliftModelWrapper` wraps both models and exposes a single prediction interface.
-
-For each input user, the registered model returns:
+At prediction time, the wrapper returns:
 
 ```text
 treatment_probability
@@ -446,84 +431,63 @@ control_probability
 uplift_score
 ```
 
-Where:
+### Why Model Registry?
 
-```text
-uplift_score = treatment_probability - control_probability
+Previous phases loaded models from local pickle paths. This is not ideal for production because API code would depend on hard-coded local files.
+
+With MLflow Model Registry, the serving layer can load:
+
+models:/uplift_model@champion
+
+The champion alias points to the model version currently approved for serving.
+
+Start MLflow
+
+For local development with registry support:
+
+mlflow ui --backend-store-uri sqlite:///mlflow.db --host 0.0.0.0 --port 5000
+
+Then set:
+
+```bash
+$env:MLFLOW_TRACKING_URI="http://localhost:5000"
+```
+
+Register uplift model
+
+```bash
+make register-uplift
+```
+
+Or:
+
+```bash
+python -m src.models.register_uplift_model
+```
+
+Test loading by alias
+
+```bash
+make test-registry
+```
+
+Or:
+```bash
+python -c "import pandas as pd; from src.data.constants import FEATURE_COLS; from src.serving.model_loader import load_uplift_model; model=load_uplift_model(); X=pd.DataFrame([{f:0.0 for f in FEATURE_COLS}]); print(model.predict(X))"
 ```
 
 ### Files
 
 ```text
-src/models/uplift_wrapper.py      # Custom MLflow PyFunc wrapper
-src/models/register_model.py      # Registers uplift model into MLflow Registry
-src/serving/model_loader.py       # Loads model using registry alias
-tests/test_model_loader.py        # Tests model URI loading logic
+src/models/uplift_wrapper.py
+src/models/register_uplift_model.py
+src/serving/model_loader.py
 ```
 
-### Register the Model
-
-First, train the uplift model:
-
-```bash
-python -m src.models.train_uplift_model
-```
-
-This creates:
+### Expected registered model
 
 ```text
-artifacts/treatment_model.pkl
-artifacts/control_model.pkl
-```
-
-Then register the model:
-
-```bash
-python -m src.models.register_model
-```
-
-Expected output:
-
-```text
-Registered model: uplift_model
+Name: uplift_model
 Alias: champion
-Model URI: models:/uplift_model@champion
+URI: models:/uplift_model@champion
 ```
-
-### Open MLflow UI
-
-```bash
-mlflow ui --backend-store-uri sqlite:///mlflow.db --host 127.0.0.1 --port 5000
-```
-
-Open:
-
-```text
-http://127.0.0.1:5000
-```
-
-Then check:
-
-```text
-Models → uplift_model → Alias: champion
-```
-
-### Test Registry Loading
-
-```bash
-python -c "import mlflow; import pandas as pd; mlflow.set_tracking_uri('sqlite:///mlflow.db'); model=mlflow.pyfunc.load_model('models:/uplift_model@champion'); df=pd.read_parquet('data/processed/valid.parquet'); cols=[f'f{i}' for i in range(11)]; print(model.predict(df[cols].head(5)))"
-```
-
-Expected output columns:
-
-```text
-treatment_probability
-control_probability
-uplift_score
-```
-
-### Why This Matters
-
-Using MLflow Model Registry separates model training from model serving.
-
-Instead of deploying the API with fixed local artifact paths, the API only depends on a model name and alias. This is closer to production deployment patterns, where the serving system loads the current champion model version from a registry.
