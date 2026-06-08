@@ -72,8 +72,6 @@ def create_app(
             default=True,
         )
     
-    app.middleware("http")(prometheus_middleware)
-    
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.enable_decision_logging = enable_decision_logging
@@ -94,6 +92,8 @@ def create_app(
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    app.middleware("http")(prometheus_middleware)
 
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
