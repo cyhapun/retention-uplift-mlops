@@ -24,6 +24,7 @@ from src.serving.schemas import (
     ModelInfoResponse,
 )
 
+from src.serving.metrics import metrics_response, prometheus_middleware, record_decision_metrics
 
 def parse_bool(value: str | None, default: bool = True) -> bool:
     if value is None:
@@ -70,7 +71,9 @@ def create_app(
             os.getenv("ENABLE_DECISION_LOGGING"),
             default=True,
         )
-
+    
+    app.middleware("http")(prometheus_middleware)
+    
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.enable_decision_logging = enable_decision_logging
@@ -175,7 +178,17 @@ def create_app(
                     detail=f"Failed to log decision: {exc}",
                 ) from exc
 
+        record_decision_metrics(
+            recommended_action=response.recommended_action,
+            uplift_score=response.uplift_score,
+            expected_incremental_value=response.expected_incremental_value,
+        )
+
         return response
+    
+    @app.get("/metrics")
+    def metrics():
+        return metrics_response()
 
     return app
 
