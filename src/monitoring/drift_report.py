@@ -65,9 +65,7 @@ def calculate_simple_drift_summary(
         )
 
     drift_by_feature = pd.DataFrame(rows)
-    drifted_features = drift_by_feature.loc[
-        drift_by_feature["is_drifted"], "feature"
-    ].tolist()
+    drifted_features = drift_by_feature.loc[drift_by_feature["is_drifted"], "feature"].tolist()
 
     drifted_feature_share = len(drifted_features) / len(FEATURE_COLS)
     dataset_drift_detected = drifted_feature_share >= 0.3

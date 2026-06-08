@@ -30,11 +30,12 @@ class DecisionLog(Base):
     model_version: Mapped[str] = mapped_column(String, nullable=False)
 
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
-    
+
     feedback_logs: Mapped[list["FeedbackLog"]] = relationship(
         back_populates="decision_log",
         cascade="all, delete-orphan",
     )
+
 
 class FeedbackLog(Base):
     __tablename__ = "feedback_logs"
@@ -62,6 +63,7 @@ class FeedbackLog(Base):
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     decision_log: Mapped[DecisionLog] = relationship(back_populates="feedback_logs")
+
 
 Index("idx_decision_logs_created_action", DecisionLog.created_at, DecisionLog.recommended_action)
 Index("idx_feedback_logs_observed_at", FeedbackLog.observed_at)

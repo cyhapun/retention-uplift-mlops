@@ -174,4 +174,15 @@ docker-simulate-feedback:
 
 docker-feedback-summary:
 	docker compose exec postgres psql -U retentionops -d retentionops -c "SELECT d.recommended_action, COUNT(f.feedback_id) AS n_feedback, AVG(f.observed_outcome) AS observed_outcome_rate, SUM(f.realized_value) AS total_realized_value FROM feedback_logs f JOIN decision_logs d ON d.decision_id = f.decision_id GROUP BY d.recommended_action ORDER BY n_feedback DESC;"
-	
+
+.PHONY: ci ci-docker
+
+ci:
+	ruff check src tests
+	ruff format src tests --check
+	pytest tests -q
+
+ci-docker:
+	docker compose config
+	docker compose build api jobs
+	docker compose run --rm --no-deps jobs pytest tests -q

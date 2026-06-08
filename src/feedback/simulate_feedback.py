@@ -92,10 +92,7 @@ def simulate_feedback_for_decisions(
 
     summary_by_action = get_feedback_summary_by_action(session)
 
-    total_realized_value = sum(
-        float(feedback.realized_value)
-        for feedback in created_feedback
-    )
+    total_realized_value = sum(float(feedback.realized_value) for feedback in created_feedback)
 
     observed_outcome_rate = (
         sum(int(feedback.observed_outcome) for feedback in created_feedback) / len(created_feedback)

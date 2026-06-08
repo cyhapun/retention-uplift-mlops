@@ -1090,3 +1090,63 @@ reports/
 data/processed/
 Docker volumes
 ```
+
+## Phase 13: GitHub Actions CI/CD
+
+This phase adds automated validation with GitHub Actions.
+
+### Workflows
+
+| Workflow | File | Purpose |
+|---|---|---|
+| Python CI | `.github/workflows/ci.yml` | Run lint, format check, and tests |
+| Docker CI | `.github/workflows/docker.yml` | Validate Docker Compose, build images, and run tests in container |
+
+### Python CI checks
+
+```bash
+ruff check src tests
+ruff format src tests --check
+pytest tests -q
+```
+
+Docker CI checks
+
+```bash
+docker compose config
+docker compose build api jobs
+docker compose run --rm --no-deps jobs pytest tests -q
+```
+
+Run CI locally
+
+```bash
+make ci
+make ci-docker
+```
+
+### Pull request workflow
+
+Every PR should pass:
+
+```bash
+Python CI
+Docker CI
+```
+
+before merge.
+
+### Why Docker CI does not start the full stack
+
+The full stack requires a trained and registered MLflow model:
+
+```text
+models:/uplift_model@champion
+```
+
+Model artifacts are generated runtime files and are not committed. Therefore, Docker CI validates image build and containerized tests, while full end-to-end stack validation remains a local smoke test:
+
+```powershell
+.\scripts\docker-bootstrap.ps1 -Train -Monitoring
+.\scripts\docker-smoke-test.ps1
+```
