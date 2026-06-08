@@ -1,4 +1,61 @@
 services:
-  placeholder:
-    image: alpine:latest
-    command: ["echo", "RetentionOps stack will be added in later phases"]
+  mlflow:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: retentionops-mlflow
+    working_dir: /app
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:////app/mlflow.db
+      --default-artifact-root /app/mlruns
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    environment:
+      PYTHONPATH: /app
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: retentionops-api
+    working_dir: /app
+    command: >
+      uvicorn src.serving.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      PYTHONPATH: /app
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      UPLIFT_MODEL_NAME: uplift_model
+      UPLIFT_MODEL_ALIAS: champion
+    depends_on:
+      - mlflow
+
+  jobs:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: retentionops-jobs
+    working_dir: /app
+    command: bash
+    profiles:
+      - jobs
+    volumes:
+      - .:/app
+    environment:
+      PYTHONPATH: /app
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      UPLIFT_MODEL_NAME: uplift_model
+      UPLIFT_MODEL_ALIAS: champion
+    depends_on:
+      - mlflow
