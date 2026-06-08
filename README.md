@@ -900,3 +900,90 @@ This phase produces a retraining signal:
 should_retrain: true / false
 retrain_reasons: [...]
 ``` 
+
+## Phase 11: Delayed Feedback Simulation
+
+This phase simulates delayed feedback for API decisions.
+
+The API stores decisions in:
+
+```text
+decision_logs
+```
+
+The feedback simulation creates observed outcomes in:
+
+```text
+feedback_logs
+```
+
+### Feedback logic
+
+For each decision without feedback:
+
+```text
+if recommended_action != no_action:
+    outcome_probability = treatment_probability
+else:
+    outcome_probability = control_probability
+```
+
+Then the simulator samples:
+
+```text
+observed_outcome ~ Bernoulli(outcome_probability)
+```
+
+And calculates:
+
+```text
+realized_value = observed_outcome * customer_value - treatment_cost
+```
+
+### Run feedback simulation
+
+```bash
+docker compose run --rm jobs python -m src.feedback.simulate_feedback --limit 1000 --feedback-delay-days 7
+```
+
+Or:
+
+```bash
+make docker-simulate-feedback
+```
+
+### Query feedback logs
+
+```bash
+docker compose exec postgres psql -U retentionops -d retentionops
+
+SELECT COUNT(*) FROM feedback_logs;
+
+SELECT
+  d.user_id,
+  d.recommended_action,
+  d.uplift_score,
+  d.expected_incremental_value,
+  f.observed_outcome,
+  f.realized_value
+FROM feedback_logs f
+JOIN decision_logs d
+  ON d.decision_id = f.decision_id
+ORDER BY f.created_at DESC
+LIMIT 10;
+```
+
+### Why this matters
+
+Delayed feedback closes the decision loop.
+
+It helps answer:
+
+```text
+Which decisions eventually converted?
+Which actions created realized value?
+How does expected value compare with simulated realized value?
+Which logged decisions can be used for future retraining?
+```
+
+This phase prepares the project for retraining and model lifecycle automation.

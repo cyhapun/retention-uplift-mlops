@@ -154,3 +154,17 @@ docker-drift-report:
 
 docker-drift-report-drifted:
 	docker compose run --rm jobs python -m src.monitoring.drift_report --current-path data/processed/test_drifted.parquet --report-name data_drift_report_drifted
+
+.PHONY: simulate-feedback test-feedback docker-simulate-feedback docker-feedback-summary
+
+simulate-feedback:
+	python -m src.feedback.simulate_feedback --limit 1000 --feedback-delay-days 7
+
+test-feedback:
+	pytest tests/test_feedback_simulation.py tests/test_feedback_repository.py -q
+
+docker-simulate-feedback:
+	docker compose run --rm jobs python -m src.feedback.simulate_feedback --limit 1000 --feedback-delay-days 7
+
+docker-feedback-summary:
+	docker compose exec postgres psql -U retentionops -d retentionops -c "SELECT d.recommended_action, COUNT(f.feedback_id) AS n_feedback, AVG(f.observed_outcome) AS observed_outcome_rate, SUM(f.realized_value) AS total_realized_value FROM feedback_logs f JOIN decision_logs d ON d.decision_id = f.decision_id GROUP BY d.recommended_action ORDER BY n_feedback DESC;"
