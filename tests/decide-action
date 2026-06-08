@@ -1,0 +1,23 @@
+$body = @{
+  user_id = "user_001"
+  customer_value = 100
+  features = @{
+    f0 = 0.0
+    f1 = 0.0
+    f2 = 0.0
+    f3 = 0.0
+    f4 = 0.0
+    f5 = 0.0
+    f6 = 0.0
+    f7 = 0.0
+    f8 = 0.0
+    f9 = 0.0
+    f10 = 0.0
+  }
+} | ConvertTo-Json -Depth 4
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8000/decide-action" `
+  -Method Post `
+  -Body $body `
+  -ContentType "application/json"
