@@ -1,55 +1,70 @@
-# RetentionOps
+# RetentionOps: Uplift Modeling MLOps System
 
-RetentionOps is an end-to-end uplift modeling and MLOps project for customer retention decisioning.
+RetentionOps is an end-to-end MLOps project for retention decisioning with uplift modeling.
 
-## Problem Statement
+Instead of asking:
 
-Traditional churn models estimate which users are likely to churn or convert. However, high risk does not always mean high treatment value.
+> Who is likely to convert?
 
-This project focuses on uplift modeling:
+this project asks:
 
-> The best customers to target are those whose behavior changes because of the intervention.
+> Who is likely to change behavior because of an intervention?
 
-## Project Goal
-
-Given user features, the system will:
-
-1. Predict the outcome under treatment.
-2. Predict the outcome under control.
-3. Estimate uplift.
-4. Calculate expected incremental value.
-5. Recommend the best business action.
-6. Serve decisions through a FastAPI service.
-7. Log decisions for monitoring, audit, feedback, and retraining.
-
-## Dataset
-
-This project uses the Criteo Uplift Prediction Dataset, which contains treatment/control assignment and outcome labels suitable for uplift modeling.
-
-Expected columns:
-
-- `f0` to `f10`: user features
-- `treatment`: treatment/control flag
-- `conversion`: main target
-- `visit`: optional target for MVP if conversion is too sparse
+The system estimates uplift, applies a business policy, serves decisions through FastAPI, logs decisions to PostgreSQL, monitors the API with Prometheus/Grafana, detects drift with Evidently, and simulates delayed feedback for future retraining.
 
 ## Architecture
 
-```text
-Raw Data
-  -> Data Processing
-  -> EDA
-  -> Baseline Response Model
-  -> T-Learner Uplift Model
-  -> Business Policy Engine
-  -> MLflow Registry
-  -> FastAPI Decision Service
-  -> PostgreSQL Decision Logs
-  -> Prometheus + Grafana Monitoring
-  -> Evidently Drift Detection
-  -> Feedback Simulation
-  -> Retraining Trigger
+See: [docs/architecture.md](docs/architecture.md)
+
+## Key Features
+
+- Full-file data sampling to preserve treatment/control groups
+- EDA and problem framing for uplift modeling
+- Baseline response models
+- T-Learner uplift model
+- MLflow experiment tracking and model registry
+- FastAPI decision service
+- Config-driven business policy engine
+- PostgreSQL decision logging
+- Delayed feedback simulation
+- Prometheus and Grafana monitoring
+- Evidently drift detection
+- Docker Compose full local stack
+- GitHub Actions CI/CD
+
+## Quick Start
+
+```powershell
+Copy-Item .env.example .env
+docker compose build
+.\scripts\docker-bootstrap.ps1 -Train -Monitoring
+.\scripts\docker-smoke-test.ps1
 ```
+
+## URLs
+
+| Service | URL |
+|---------|-----|
+| MLflow | http://localhost:5000 |
+| FastAPI docs | http://localhost:8000/docs |
+| Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3000 |
+
+Grafana login:
+
+- `admin` / `admin`
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [docs/architecture.md](docs/architecture.md) | System architecture |
+| [docs/demo.md](docs/demo.md) | End-to-end demo |
+| [docs/api_examples.md](docs/api_examples.md) | API request examples |
+| [docs/modeling_notes.md](docs/modeling_notes.md) | Modeling explanation |
+| [docs/mlops_lifecycle.md](docs/mlops_lifecycle.md) | MLOps lifecycle |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Common issues and fixes |
+| [docs/project_summary.md](docs/project_summary.md) | Portfolio summary |
 
 ## Project Structure
 
@@ -76,7 +91,7 @@ retentionops/
 └── README.md
 ```
 
-## Setup
+## Local Development Setup
 
 Create virtual environment:
 
@@ -91,19 +106,17 @@ Install dependencies:
 make install
 ```
 
-Run tests:
+Run tests and linting:
 
 ```bash
 make test
-```
-
-Run lint:
-
-```bash
 make lint
 ```
 
-## Phase 1: Data Ingestion and Sampling
+## System Components & Workflow
+
+<details>
+<summary><b>Data Ingestion and Sampling</b></summary>
 
 The raw Criteo uplift dataset should be placed at:
 
@@ -143,7 +156,10 @@ The raw Criteo uplift CSV can be ordered by treatment assignment. Therefore, the
 
 Instead, RetentionOps samples rows across the full raw CSV using chunked reading. This ensures that the generated train, validation, and test datasets contain both treatment and control groups.
 
-## Phase 2: EDA and Problem Framing
+</details>
+
+<details>
+<summary><b>Exploratory Data Analysis (EDA)</b></summary>
 
 The processed training dataset is explored in:
 
@@ -172,9 +188,12 @@ notebooks/01_data_exploration.ipynb
    - Moderate to strong **multicollinearity** exists between certain feature pairs (e.g., `f5` and `f7`).
    - **Action**: **Tree-based models** (like XGBoost, LightGBM) are highly recommended as they naturally handle multicollinearity, non-linear relationships, and skewed features without requiring extensive scaling or transformations.
 
-## Phase 3: Baseline Response Model
+</details>
 
-This phase trains standard binary classification models to predict:
+<details>
+<summary><b>Baseline Response Model</b></summary>
+
+Standard binary classification models are trained to predict:
 
 ```text
 P(conversion | features)
@@ -184,39 +203,35 @@ This is not an uplift model yet. It is a baseline response model used for compar
 
 ### Models
 
-Logistic Regression
-Random Forest
-XGBoost
+- Logistic Regression
+- Random Forest
+- XGBoost
 
 ### Metrics
 
-ROC-AUC
-PR-AUC
-Log loss
+- ROC-AUC
+- PR-AUC
+- Log loss
 
 Because the target can be highly imbalanced, PR-AUC is used as the main model selection metric.
 
 ### Run MLflow UI
 
-```text
+```bash
 mlflow ui --host 0.0.0.0 --port 5000
 ```
 
-Open:
-
-```text
-http://localhost:5000
-```
+Open: `http://localhost:5000`
 
 ### Train response models
 
-```text
+```bash
 make train-response
 ```
 
 Or:
 
-```text
+```bash
 python -m src.models.train_response_model
 ```
 
@@ -228,11 +243,14 @@ The best baseline response model is saved locally to:
 artifacts/response_model.pkl
 ```
 
-MLflow logs each candidate model with params, metrics, and model artifacts under the response_model experiment.
+MLflow logs each candidate model with params, metrics, and model artifacts under the `response_model` experiment.
 
-## Phase 4: T-Learner Uplift Model
+</details>
 
-This phase trains a T-Learner uplift model to estimate the incremental effect of treatment.
+<details>
+<summary><b>T-Learner Uplift Model</b></summary>
+
+A T-Learner uplift model is trained to estimate the incremental effect of treatment.
 
 The uplift score is defined as:
 
@@ -241,7 +259,8 @@ uplift_score = P(conversion | treatment = 1, features) - P(conversion | treatmen
 ```
 
 ### Why this matters
-The baseline response model from Phase 3 predicts:
+
+The baseline response model predicts:
 
 ```text
 P(conversion | features)
@@ -255,14 +274,12 @@ A user with high conversion probability may convert even without an intervention
 
 The T-Learner trains two separate outcome models:
 
-```text
-treatment_model: trained on treatment = 1 users
-control_model: trained on treatment = 0 users
-```
+- `treatment_model`: trained on treatment = 1 users
+- `control_model`: trained on treatment = 0 users
 
 At prediction time:
 
-```text
+```python
 treatment_probability = treatment_model.predict_proba(features)
 control_probability = control_model.predict_proba(features)
 uplift_score = treatment_probability - control_probability
@@ -272,19 +289,19 @@ uplift_score = treatment_probability - control_probability
 
 Start MLflow UI:
 
-```text
+```bash
 mlflow ui --host 0.0.0.0 --port 5000
 ```
 
 Train uplift model:
    
-```text
+```bash
 make train-uplift
 ```
 
 Or:
 
-```text
+```bash
 python -m src.models.train_uplift_model
 ```
 
@@ -300,44 +317,39 @@ reports/uplift/uplift_decile_report.csv
 reports/uplift/qini_curve.csv
 ```
 
-MLflow experiment:
-
-```text
-uplift_model
-```
+MLflow experiment: `uplift_model`
 
 Logged metrics include:
 
-```text
-treatment_model_roc_auc
-treatment_model_pr_auc
-treatment_model_log_loss
-control_model_roc_auc
-control_model_pr_auc
-control_model_log_loss
-mean_predicted_uplift
-share_positive_uplift
-qini_auc
-incremental_qini_auc
-top_decile_observed_uplift
-```
+- `treatment_model_roc_auc`
+- `treatment_model_pr_auc`
+- `treatment_model_log_loss`
+- `control_model_roc_auc`
+- `control_model_pr_auc`
+- `control_model_log_loss`
+- `mean_predicted_uplift`
+- `share_positive_uplift`
+- `qini_auc`
+- `incremental_qini_auc`
+- `top_decile_observed_uplift`
 
 ### Evaluation note
 
-Uplift models cannot be evaluated only with standard classification metrics because each user has only one observed outcome. Therefore, this phase also uses uplift-specific diagnostics:
+Uplift models cannot be evaluated only with standard classification metrics because each user has only one observed outcome. Therefore, uplift-specific diagnostics are also used:
 
-```text
-uplift by decile
-observed uplift by bucket
-Qini curve
-Qini/AUUC-style area metrics
-```
+- uplift by decile
+- observed uplift by bucket
+- Qini curve
+- Qini/AUUC-style area metrics
 
-## Phase 5: Business Policy Engine
+</details>
 
-This phase converts uplift predictions into business decisions.
+<details>
+<summary><b>Business Policy Engine</b></summary>
 
-The uplift model from Phase 4 estimates:
+The policy engine converts uplift predictions into business decisions.
+
+The uplift model estimates:
 
 ```text
 uplift_score = P(conversion | treatment = 1, features) - P(conversion | treatment = 0, features)
@@ -349,40 +361,36 @@ The policy engine converts this score into expected incremental value:
 expected_incremental_value = uplift_score * customer_value - treatment_cost
 ```
 
-Actions
+### Actions
 
 The current policy supports:
 
-```text
-Action	Cost	Purpose
-no_action	0.0	Do not intervene
-low_cost_email	0.2	Low-cost intervention
-standard_discount	5.0	Medium-cost offer
-premium_offer	15.0	High-value intervention
-```
+| Action | Cost | Purpose |
+|--------|------|---------|
+| `no_action` | 0.0 | Do not intervene |
+| `low_cost_email` | 0.2 | Low-cost intervention |
+| `standard_discount` | 5.0 | Medium-cost offer |
+| `premium_offer` | 15.0 | High-value intervention |
 
-Policy config
+### Policy config
 
-Policy rules are configured in:
-
-```text
-src/policy/policy_config.yaml
-```
+Policy rules are configured in: `src/policy/policy_config.yaml`
 
 Run policy tests:
 
-```text
+```bash
 make test-policy
 ```
 
 Or:
 
-```text
+```bash
 pytest tests/test_policy.py tests/test_budget_optimizer.py -q
 ```
 
-Example
-```text
+### Example
+
+```python
 from src.policy.decision_engine import recommend_action_from_policy
 
 decision = recommend_action_from_policy(
@@ -392,6 +400,7 @@ decision = recommend_action_from_policy(
 
 print(decision)
 ```
+
 Example output:
 
 ```text
@@ -400,60 +409,57 @@ expected_incremental_value: 7.0
 treatment_cost: 5.0
 ```
 
-Why this matters
+### Why this matters
 
-A model score alone is not a business decision. The policy engine makes the project production-oriented by separating:
+A model score alone is not a business decision. The policy engine makes the project production-oriented by separating ML prediction logic from business decision logic.
 
-ML prediction logic
-```text
-from
-business decision logic
-```
+This makes the system easier to test, audit, tune, and serve through the FastAPI service.
 
-This makes the system easier to test, audit, tune, and serve through the FastAPI service in later phases.
+</details>
 
-## Phase 6: MLflow Model Registry
+<details>
+<summary><b>MLflow Model Registry</b></summary>
 
-This phase registers the T-Learner uplift model as a single MLflow PyFunc model.
+The T-Learner uplift model is registered as a single MLflow PyFunc model.
 
 The registered model wraps two artifacts:
 
-```text
-treatment_model.pkl
-control_model.pkl
-```
+- `treatment_model.pkl`
+- `control_model.pkl`
 
 At prediction time, the wrapper returns:
 
-```text
-treatment_probability
-control_probability
-uplift_score
-```
+- `treatment_probability`
+- `control_probability`
+- `uplift_score`
 
 ### Why Model Registry?
 
-Previous phases loaded models from local pickle paths. This is not ideal for production because API code would depend on hard-coded local files.
+During experimentation, models are loaded from local pickle paths. This is not ideal for production because API code would depend on hard-coded local files.
 
 With MLflow Model Registry, the serving layer can load:
 
+```text
 models:/uplift_model@champion
+```
 
-The champion alias points to the model version currently approved for serving.
+The `champion` alias points to the model version currently approved for serving.
 
-Start MLflow
+### Start MLflow
 
 For local development with registry support:
 
+```bash
 mlflow ui --backend-store-uri sqlite:///mlflow.db --host 0.0.0.0 --port 5000
+```
 
 Then set:
 
-```bash
+```powershell
 $env:MLFLOW_TRACKING_URI="http://localhost:5000"
 ```
 
-Register uplift model
+### Register uplift model
 
 ```bash
 make register-uplift
@@ -465,24 +471,23 @@ Or:
 python -m src.models.register_uplift_model
 ```
 
-Test loading by alias
+### Test loading by alias
 
 ```bash
 make test-registry
 ```
 
 Or:
+
 ```bash
 python -c "import pandas as pd; from src.data.constants import FEATURE_COLS; from src.serving.model_loader import load_uplift_model; model=load_uplift_model(); X=pd.DataFrame([{f:0.0 for f in FEATURE_COLS}]); print(model.predict(X))"
 ```
 
 ### Files
 
-```text
-src/models/uplift_wrapper.py
-src/models/register_uplift_model.py
-src/serving/model_loader.py
-```
+- `src/models/uplift_wrapper.py`
+- `src/models/register_uplift_model.py`
+- `src/serving/model_loader.py`
 
 ### Expected registered model
 
@@ -492,9 +497,12 @@ Alias: champion
 URI: models:/uplift_model@champion
 ```
 
-## Phase 7: FastAPI Decision Service
+</details>
 
-This phase exposes the uplift model and policy engine through a REST API.
+<details>
+<summary><b>FastAPI Decision Service</b></summary>
+
+The FastAPI service exposes the uplift model and policy engine through a REST API.
 
 The API flow is:
 
@@ -508,15 +516,13 @@ Request features
 → Return recommended action
 ```
 
-### Start MLflow
+### Start MLflow & Set tracking URI
 
 ```bash
 mlflow ui --backend-store-uri sqlite:///mlflow.db --host 0.0.0.0 --port 5000
 ```
 
-### Set tracking URI
-
-```bash
+```powershell
 $env:MLFLOW_TRACKING_URI="http://localhost:5000"
 ```
 
@@ -532,55 +538,35 @@ Or:
 uvicorn src.serving.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Open Swagger UI
+### Endpoints & Docs
 
-```text
-http://localhost:8000/docs
-```
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
 
-### Open ReDoc
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET` | `/health` | Health check |
+| `GET` | `/model-info` | Current model name, alias, and URI |
+| `POST` | `/decide-action` | Predict uplift and recommend action |
 
-```text
-http://localhost:8000/redoc
-```
+### Example request & response
 
-### Endpoints
+**Request**:
 
-http://localhost:8000/redoc
-
-```text
-Endpoints
-Method	Endpoint	Purpose
-GET	/health	Health check
-GET	/model-info	Current model name, alias, and URI
-POST	/decide-action	Predict uplift and recommend action
-```
-
-### Example request
-
-```text
+```json
 {
   "user_id": "user_001",
   "customer_value": 100,
   "features": {
-    "f0": 0.0,
-    "f1": 0.0,
-    "f2": 0.0,
-    "f3": 0.0,
-    "f4": 0.0,
-    "f5": 0.0,
-    "f6": 0.0,
-    "f7": 0.0,
-    "f8": 0.0,
-    "f9": 0.0,
-    "f10": 0.0
+    "f0": 0.0, "f1": 0.0, "f2": 0.0, "f3": 0.0, "f4": 0.0,
+    "f5": 0.0, "f6": 0.0, "f7": 0.0, "f8": 0.0, "f9": 0.0, "f10": 0.0
   }
 }
 ```
 
-### Example response
+**Response**:
 
-```text
+```json
 {
   "user_id": "user_001",
   "treatment_probability": 0.25,
@@ -614,19 +600,15 @@ Or:
 pytest tests/test_api.py tests/test_schemas.py -q
 ```
 
-## Docker Development Workflow
+### Docker Development Workflow
 
 To avoid running MLflow, model registration, and FastAPI manually in multiple terminals, use the Docker Compose dev stack.
 
-### Services
-
 | Service | Purpose |
-|---|---|
+|---------|---------|
 | `mlflow` | MLflow Tracking and Model Registry |
 | `api` | FastAPI decision service |
 | `jobs` | One-off commands for training, registration, and tests |
-
-### First run
 
 If processed data already exists:
 
@@ -640,15 +622,14 @@ If data also needs to be generated:
 .\scripts\docker-dev.ps1 -BuildData -Train
 ```
 
-Regular run
+Regular run:
+
 ```bash
 docker compose up -d mlflow api
 ```
-URLs
-MLflow: http://localhost:5000
-API docs: http://localhost:8000/docs
-Health: http://localhost:8000/health
-Useful commands
+
+Useful commands:
+
 ```bash
 docker compose logs -f
 docker compose logs -f api
@@ -656,29 +637,15 @@ docker compose logs -f mlflow
 docker compose down
 ```
 
-## Phase 8: PostgreSQL Decision Logging
+</details>
 
-This phase logs each API decision to PostgreSQL.
+<details>
+<summary><b>PostgreSQL Decision Logging</b></summary>
+
+Each API decision is logged to PostgreSQL.
 
 When `/decide-action` is called, the API stores:
-
-```text
-decision_id
-user_id
-features
-treatment_probability
-control_probability
-uplift_score
-customer_value
-treatment_cost
-expected_incremental_value
-roi
-recommended_action
-decision_reason
-model_name
-model_alias
-model_version
-created_at
+`decision_id`, `user_id`, `features`, `treatment_probability`, `control_probability`, `uplift_score`, `customer_value`, `treatment_cost`, `expected_incremental_value`, `roi`, `recommended_action`, `decision_reason`, `model_name`, `model_alias`, `model_version`, `created_at`.
 
 ### Start services
 
@@ -702,7 +669,6 @@ docker compose up -d api
 
 ```bash
 docker compose exec postgres psql -U retentionops -d retentionops
-```
 ```
 
 ```sql
@@ -730,30 +696,29 @@ ORDER BY COUNT(*) DESC;
 Decision logging makes the system auditable and production-oriented.
 
 The logs will be used later for:
+- monitoring action distribution
+- tracking average uplift score
+- simulating delayed feedback
+- evaluating model decisions
+- triggering retraining
 
-monitoring action distribution
-tracking average uplift score
-simulating delayed feedback
-evaluating model decisions
-triggering retraining
+</details>
 
-## Phase 9: Prometheus Metrics and Grafana Dashboard
+<details>
+<summary><b>Prometheus Metrics and Grafana Dashboard</b></summary>
 
-This phase adds monitoring for the FastAPI decision service.
+Monitoring is added for the FastAPI decision service.
 
-The API exposes Prometheus metrics at:
+The API exposes Prometheus metrics at `/metrics`.
 
-```text
-/metrics
-Metrics
-Metric	Purpose
-retentionops_api_requests_total	API request count
-retentionops_api_errors_total	API error count
-retentionops_api_latency_seconds	API latency histogram
-retentionops_recommended_action_total	Recommended action distribution
-retentionops_uplift_score	Uplift score distribution
-retentionops_expected_incremental_value	Expected value distribution
-```
+| Metric | Purpose |
+|--------|---------|
+| `retentionops_api_requests_total` | API request count |
+| `retentionops_api_errors_total` | API error count |
+| `retentionops_api_latency_seconds` | API latency histogram |
+| `retentionops_recommended_action_total` | Recommended action distribution |
+| `retentionops_uplift_score` | Uplift score distribution |
+| `retentionops_expected_incremental_value` | Expected value distribution |
 
 ### Start monitoring stack
 
@@ -763,50 +728,24 @@ docker compose up -d postgres mlflow api prometheus grafana
 
 ### URLs
 
-```text
-FastAPI docs: http://localhost:8000/docs
-Metrics: http://localhost:8000/metrics
-Prometheus: http://localhost:9090
-Grafana: http://localhost:3000
-```
-
-#### Grafana login
-
-```text
-username: admin
-password: admin
-```
+- FastAPI docs: `http://localhost:8000/docs`
+- Metrics: `http://localhost:8000/metrics`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (Login: `admin` / `admin`)
 
 ### Prometheus target
 
-In Prometheus:
-```text
-Status → Targets
-```
-
-Expected target:
-
-```text
-retentionops-api UP
-```
+In Prometheus (`Status → Targets`), you should see: `retentionops-api UP`
 
 ### Grafana dashboard
 
-Dashboard path:
+Dashboard path: `Dashboards → RetentionOps → RetentionOps Monitoring`
 
-```text
-Dashboards → RetentionOps → RetentionOps Monitoring
-```
+Panels include: API Requests per Second, API p95 Latency, API Error Rate, Recommended Action Distribution, Average Uplift Score, Average Expected Incremental Value.
 
-### Panels
-```text
-API Requests per Second
-API p95 Latency
-API Error Rate
-Recommended Action Distribution
-Average Uplift Score
-Average Expected Incremental Value
-Generate traffic
+### Generate traffic
+
+```powershell
 1..20 | ForEach-Object {
   Invoke-RestMethod `
     -Uri "http://localhost:8000/decide-action" `
@@ -819,56 +758,45 @@ Generate traffic
 ### Why this matters
 
 Monitoring makes the decision service observable. It helps answer:
-```text
-Is the API healthy?
-Is latency increasing?
-Are errors happening?
-Which actions are being recommended most often?
-Is uplift score distribution changing?
-Is expected value still positive?
-```
+- Is the API healthy?
+- Is latency increasing?
+- Are errors happening?
+- Which actions are being recommended most often?
+- Is uplift score distribution changing?
+- Is expected value still positive?
 
-## Phase 10: Drift Detection with Evidently
+</details>
 
-This phase compares reference data against current or simulated production data to detect data drift.
+<details>
+<summary><b>Drift Detection with Evidently</b></summary>
 
-Reference data:
+Reference data is compared against current or simulated production data to detect data drift.
 
-```text
-data/reference/reference.parquet
-```
+- Reference data: `data/reference/reference.parquet`
+- Current data: `data/processed/test.parquet`
+- Simulated drifted data: `data/processed/test_drifted.parquet`
 
-Current data:
+### Run drift reports
 
-```text
-data/processed/test.parquet
-```
-
-Simulated drifted data:
-
-```text
-data/processed/test_drifted.parquet
-```
-
-Run normal drift report
+Run normal drift report:
 
 ```bash
 docker compose run --rm jobs python -m src.monitoring.drift_report --current-path data/processed/test.parquet --report-name data_drift_report
 ```
 
-Create simulated drift
+Create simulated drift:
 
 ```bash
 docker compose run --rm jobs python -m src.monitoring.simulate_drift
 ```
 
-Run drifted report
+Run drifted report:
 
 ```bash
 docker compose run --rm jobs python -m src.monitoring.drift_report --current-path data/processed/test_drifted.parquet --report-name data_drift_report_drifted
 ```
 
-Outputs
+### Outputs
 
 ```text
 reports/drift/data_drift_report_summary.json
@@ -884,61 +812,45 @@ reports/drift/data_drift_report.html
 reports/drift/data_drift_report_drifted.html
 ```
 
-Why this matters
+### Why this matters
 
 Drift detection helps answer:
+- Is production data still similar to training/reference data?
+- Are important features shifting?
+- Should we investigate or retrain the model?
 
-```text
-Is production data still similar to training/reference data?
-Are important features shifting?
-Should we investigate or retrain the model?
+This process produces a retraining signal:
+
+```json
+{
+  "should_retrain": true,
+  "retrain_reasons": ["..."]
+}
 ```
 
-This phase produces a retraining signal:
+</details>
 
-```text
-should_retrain: true / false
-retrain_reasons: [...]
-``` 
+<details>
+<summary><b>Delayed Feedback Simulation</b></summary>
 
-## Phase 11: Delayed Feedback Simulation
+Delayed feedback is simulated for API decisions.
 
-This phase simulates delayed feedback for API decisions.
-
-The API stores decisions in:
-
-```text
-decision_logs
-```
-
-The feedback simulation creates observed outcomes in:
-
-```text
-feedback_logs
-```
+The API stores decisions in `decision_logs`.
+The feedback simulation creates observed outcomes in `feedback_logs`.
 
 ### Feedback logic
 
 For each decision without feedback:
 
-```text
-if recommended_action != no_action:
+```python
+if recommended_action != 'no_action':
     outcome_probability = treatment_probability
 else:
     outcome_probability = control_probability
 ```
 
-Then the simulator samples:
-
-```text
-observed_outcome ~ Bernoulli(outcome_probability)
-```
-
-And calculates:
-
-```text
-realized_value = observed_outcome * customer_value - treatment_cost
-```
+Then the simulator samples: `observed_outcome ~ Bernoulli(outcome_probability)`
+And calculates: `realized_value = observed_outcome * customer_value - treatment_cost`
 
 ### Run feedback simulation
 
@@ -956,7 +868,9 @@ make docker-simulate-feedback
 
 ```bash
 docker compose exec postgres psql -U retentionops -d retentionops
+```
 
+```sql
 SELECT COUNT(*) FROM feedback_logs;
 
 SELECT
@@ -976,26 +890,25 @@ LIMIT 10;
 ### Why this matters
 
 Delayed feedback closes the decision loop.
-
 It helps answer:
+- Which decisions eventually converted?
+- Which actions created realized value?
+- How does expected value compare with simulated realized value?
+- Which logged decisions can be used for future retraining?
 
-```text
-Which decisions eventually converted?
-Which actions created realized value?
-How does expected value compare with simulated realized value?
-Which logged decisions can be used for future retraining?
-```
+This prepares the project for retraining and model lifecycle automation.
 
-This phase prepares the project for retraining and model lifecycle automation.
+</details>
 
-## Phase 12: Full Docker Compose Stack
+<details>
+<summary><b>Full Docker Compose Stack</b></summary>
 
-This phase finalizes the local Docker Compose stack for RetentionOps.
+The local Docker Compose stack provides a complete environment for RetentionOps.
 
 ### Services
 
 | Service | URL | Purpose |
-|---|---|---|
+|---------|-----|---------|
 | PostgreSQL | `localhost:5432` | Decision and feedback logs |
 | MLflow | `http://localhost:5000` | Tracking and Model Registry |
 | FastAPI | `http://localhost:8000/docs` | Decision API |
@@ -1028,6 +941,7 @@ If processed data needs to be generated:
 ```powershell
 .\scripts\docker-bootstrap.ps1 -BuildData -Train -Monitoring
 ```
+
 ### Regular startup
 
 If model has already been trained and registered:
@@ -1041,7 +955,7 @@ docker compose up -d postgres mlflow api prometheus grafana
 ```powershell
 .\scripts\docker-smoke-test.ps1
 ```
-Useful commands
+
 ### Useful commands
 
 ```powershell
@@ -1051,22 +965,6 @@ docker compose logs -f api
 docker compose logs -f mlflow
 docker compose down
 docker compose down -v
-```
-
-### URLs
-
-```text
-MLflow:       http://localhost:5000
-FastAPI docs: http://localhost:8000/docs
-Prometheus:   http://localhost:9090
-Grafana:      http://localhost:3000
-```
-
-Grafana login:
-
-```text
-username: admin
-password: admin
 ```
 
 ### Important note
@@ -1091,14 +989,17 @@ data/processed/
 Docker volumes
 ```
 
-## Phase 13: GitHub Actions CI/CD
+</details>
 
-This phase adds automated validation with GitHub Actions.
+<details>
+<summary><b>GitHub Actions CI/CD</b></summary>
+
+Automated validation is performed with GitHub Actions.
 
 ### Workflows
 
 | Workflow | File | Purpose |
-|---|---|---|
+|----------|------|---------|
 | Python CI | `.github/workflows/ci.yml` | Run lint, format check, and tests |
 | Docker CI | `.github/workflows/docker.yml` | Validate Docker Compose, build images, and run tests in container |
 
@@ -1110,7 +1011,7 @@ ruff format src tests --check
 pytest tests -q
 ```
 
-Docker CI checks
+### Docker CI checks
 
 ```bash
 docker compose config
@@ -1118,7 +1019,7 @@ docker compose build api jobs
 docker compose run --rm --no-deps jobs pytest tests -q
 ```
 
-Run CI locally
+### Run CI locally
 
 ```bash
 make ci
@@ -1127,22 +1028,11 @@ make ci-docker
 
 ### Pull request workflow
 
-Every PR should pass:
-
-```bash
-Python CI
-Docker CI
-```
-
-before merge.
+Every PR should pass: Python CI and Docker CI before merge.
 
 ### Why Docker CI does not start the full stack
 
-The full stack requires a trained and registered MLflow model:
-
-```text
-models:/uplift_model@champion
-```
+The full stack requires a trained and registered MLflow model (`models:/uplift_model@champion`).
 
 Model artifacts are generated runtime files and are not committed. Therefore, Docker CI validates image build and containerized tests, while full end-to-end stack validation remains a local smoke test:
 
@@ -1150,3 +1040,5 @@ Model artifacts are generated runtime files and are not committed. Therefore, Do
 .\scripts\docker-bootstrap.ps1 -Train -Monitoring
 .\scripts\docker-smoke-test.ps1
 ```
+
+</details>
