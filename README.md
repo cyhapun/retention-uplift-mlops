@@ -164,7 +164,7 @@ Instead, RetentionOps samples rows across the full raw CSV using chunked reading
 The processed training dataset is explored in:
 
 ```text
-notebooks/01_data_exploration.ipynb
+notebooks/eda.ipynb
 ```
 
 ### Key EDA Findings
