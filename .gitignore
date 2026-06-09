@@ -51,3 +51,7 @@ mlflow.db
 
 # DB
 retentionops.db
+
+# Notebook outputs
+*.csv
+*outputs/
