@@ -1042,3 +1042,55 @@ Model artifacts are generated runtime files and are not committed. Therefore, Do
 ```
 
 </details>
+
+<details>
+<summary><b>Visual Model Training Notebooks</b></summary>
+
+Production training code lives under:
+
+```text
+src/models/
+```
+
+The notebooks are visual walkthroughs. They explain and execute the training workflow by importing reusable code from `src/`.
+
+| Notebook | Purpose |
+|---|---|
+| `notebooks/03_response_model_training.ipynb` | Train and inspect baseline response models |
+| `notebooks/04_uplift_model_training.ipynb` | Train and inspect T-Learner uplift model |
+
+### Setup
+
+```bash
+pip install -r requirements-dev.txt
+python -m ipykernel install --user --name retention-uplift-mlops
+jupyter lab
+```
+
+### Regenerate notebooks
+
+```bash
+python scripts/create_training_notebooks.py
+```
+
+Or:
+
+```bash
+make create-training-notebooks
+```
+
+### Design rule
+
+Docker and CI continue to run Python scripts from `src/`.
+
+Notebooks are not production entrypoints. They are used for:
+
+- explanation
+- visual inspection
+- plots
+- model training walkthroughs
+- portfolio demo
+
+This keeps the project reproducible while making the modeling workflow easier to understand.
+
+</details>
