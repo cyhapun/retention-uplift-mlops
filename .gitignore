@@ -55,3 +55,16 @@ retentionops.db
 # Notebook outputs
 *.csv
 *outputs/
+
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+artifacts/*
+!artifacts/.gitkeep
+
+reports/*
+!reports/.gitkeep
+
+mlruns/
+mlflow.db
+retentionops.db
