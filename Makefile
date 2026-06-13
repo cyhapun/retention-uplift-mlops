@@ -193,3 +193,14 @@ docs-check:
 	python -c "from pathlib import Path; required=['README.md','docs/architecture.md','docs/demo.md','docs/api_examples.md','docs/troubleshooting.md','docs/project_summary.md','docs/modeling_notes.md','docs/mlops_lifecycle.md']; missing=[p for p in required if not Path(p).exists()]; assert not missing, f'Missing docs: {missing}'; print('Documentation files exist.')"
 
 portfolio-check: ci docs-check
+
+.PHONY: notebook notebook-kernel create-training-notebooks
+
+notebook:
+	jupyter lab
+
+notebook-kernel:
+	python -m ipykernel install --user --name retention-uplift-mlops
+
+create-training-notebooks:
+	python scripts/create_training_notebooks.py
