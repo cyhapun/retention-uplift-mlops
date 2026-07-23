@@ -16,6 +16,10 @@ The system estimates uplift, applies a business policy, serves decisions through
 
 See: [docs/architecture.md](docs/architecture.md)
 
+### End-to-End Pipeline
+
+![RetentionOps end-to-end MLOps pipeline](diagrams/retentionops_pipeline_corrected.png)
+
 ## Key Features
 
 - Full-file data sampling to preserve treatment/control groups
