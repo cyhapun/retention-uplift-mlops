@@ -68,3 +68,18 @@ to produce:
 
 - `expected_incremental_value`
 - `recommended_action`
+
+## Current Repository Results
+
+The checked-in reports provide the following reference results:
+
+| Result | Value |
+|---|---:|
+| Treatment share | 85.00% |
+| Control share | 15.00% |
+| Treatment conversion rate | 0.3089% |
+| Control conversion rate | 0.1938% |
+| Observed absolute uplift | +0.1152 percentage points |
+| Top validation uplift decile observed uplift | +0.5033 percentage points |
+
+The top uplift decile is materially stronger than the lower deciles, which supports using uplift ranking for intervention targeting. These are offline validation results, not a guarantee of production lift.

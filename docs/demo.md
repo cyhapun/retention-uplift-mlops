@@ -78,6 +78,8 @@ The smoke test checks:
 - `GET /metrics`
 - PostgreSQL decision log count
 
+A successful smoke test confirms that the registered `uplift_model@champion` can be loaded by FastAPI, a decision is returned and logged, and Prometheus metrics are exposed.
+
 ## Example API Request
 
 ```powershell
@@ -179,6 +181,15 @@ Run drifted report:
 docker compose run --rm jobs python -m src.monitoring.drift_report --current-path data/processed/test_drifted.parquet --report-name data_drift_report_drifted
 ```
 
+Expected checked-in report results:
+
+| Report | Result |
+|---|---|
+| `data_drift_report` | 0/11 features drifted; retrain not recommended |
+| `data_drift_report_drifted` | 3/11 features drifted (27.27%); below the 30% retrain threshold |
+
+The drift command writes JSON summaries, feature-level CSV files and, when supported by the installed Evidently version, HTML reports under `reports/drift/`. The retrain signal is a manual recommendation; the command does not start training automatically.
+
 ## Simulate Delayed Feedback
 
 ```bash
@@ -189,6 +200,16 @@ Check feedback logs:
 
 ```sql
 SELECT COUNT(*) FROM feedback_logs;
+
+SELECT
+  d.recommended_action,
+  COUNT(f.feedback_id) AS n_feedback,
+  AVG(f.observed_outcome) AS observed_outcome_rate,
+  SUM(f.realized_value) AS total_realized_value
+FROM feedback_logs f
+JOIN decision_logs d ON d.decision_id = f.decision_id
+GROUP BY d.recommended_action
+ORDER BY n_feedback DESC;
 ```
 
 ## Stop Stack

@@ -102,19 +102,39 @@ It demonstrates:
 
 ```text
 data ingestion
-→ validation
-→ EDA
-→ baseline model
-→ uplift model
-→ model registry
-→ API serving
-→ policy decision
-→ logging
-→ monitoring
-→ drift detection
-→ feedback simulation
+→ validation and dataset creation
+→ EDA and baseline model
+→ T-Learner uplift model
+→ evaluation and model registry
+→ API serving and policy decision
+→ PostgreSQL decision logging
+→ monitoring and drift detection
+→ delayed feedback simulation
+→ manual retraining signal
 → CI/CD
 ```
+
+## Quick Run
+
+```powershell
+Copy-Item .env.example .env
+docker compose build
+.\scripts\docker-bootstrap.ps1 -BuildData -Train -Monitoring
+.\scripts\docker-smoke-test.ps1
+```
+
+The raw file must exist at `data/raw/criteo-uplift.csv` before using `-BuildData`. If processed datasets and a registered model already exist, use `-Train -Monitoring` instead.
+
+## Main Outputs
+
+- `data/processed/train.parquet`, `valid.parquet`, `test.parquet`
+- `data/reference/reference.parquet`
+- `artifacts/uplift/treatment_model.pkl`
+- `artifacts/uplift/control_model.pkl`
+- `reports/uplift/uplift_decile_report.csv`
+- `reports/uplift/qini_curve.csv`
+- `reports/drift/*`
+- MLflow registered model `uplift_model@champion`
 
 ## Portfolio Talking Point
 
