@@ -16,6 +16,10 @@ The system estimates uplift, applies a business policy, serves decisions through
 
 See: [docs/architecture.md](docs/architecture.md)
 
+### End-to-End Pipeline
+
+![RetentionOps end-to-end MLOps pipeline](diagrams/retentionops_pipeline_corrected.png)
+
 ## Key Features
 
 - Full-file data sampling to preserve treatment/control groups
@@ -34,10 +38,17 @@ See: [docs/architecture.md](docs/architecture.md)
 
 ## Quick Start
 
+Prerequisites:
+
+- Docker Desktop with Docker Compose
+- Raw Criteo uplift data at `data/raw/criteo-uplift.csv` when building datasets
+
+For a first-time setup, use `-BuildData` with the bootstrap command below. If processed data already exists, omit `-BuildData`.
+
 ```powershell
 Copy-Item .env.example .env
 docker compose build
-.\scripts\docker-bootstrap.ps1 -Train -Monitoring
+.\scripts\docker-bootstrap.ps1 -BuildData -Train -Monitoring
 .\scripts\docker-smoke-test.ps1
 ```
 
@@ -53,6 +64,36 @@ docker compose build
 Grafana login:
 
 - `admin` / `admin`
+
+The bootstrap sequence initializes PostgreSQL, optionally builds the sampled datasets, trains the uplift model, registers `uplift_model@champion`, starts FastAPI, and optionally starts Prometheus/Grafana.
+
+## Verified Results
+
+The repository contains generated reports under `reports/` and model artifacts tracked by MLflow. The current reference results are:
+
+| Check | Result |
+|---|---:|
+| Treatment share | 85.00% |
+| Control share | 15.00% |
+| Treatment conversion rate | 0.3089% |
+| Control conversion rate | 0.1938% |
+| Observed absolute uplift | +0.1152 percentage points |
+| Top validation uplift decile | +0.5033 percentage points observed uplift |
+| Normal drift report | 0/11 features drifted; retrain not recommended |
+| Simulated drift report | 3/11 features drifted (27.27%); below the 30% retrain threshold |
+
+These are offline dataset/validation results. They demonstrate ranking and monitoring behavior; they are not a production lift guarantee.
+
+Generated outputs include:
+
+- `data/processed/train.parquet`, `valid.parquet`, `test.parquet`
+- `data/reference/reference.parquet`
+- `artifacts/uplift/treatment_model.pkl`
+- `artifacts/uplift/control_model.pkl`
+- `reports/uplift/uplift_decile_report.csv`
+- `reports/uplift/qini_curve.csv`
+- `reports/drift/data_drift_report_summary.json`
+- `reports/drift/data_drift_report_drifted_summary.json`
 
 ## Documentation
 
@@ -82,6 +123,7 @@ retentionops/
 │   └── db/
 ├── tests/
 ├── docker/
+├── diagrams/
 ├── grafana/
 ├── reports/
 ├── artifacts/
@@ -178,9 +220,9 @@ notebooks/eda.ipynb
    - **Action**: Standard metrics like Accuracy are not applicable. We must use uplift-specific metrics such as **AUUC (Area Under Uplift Curve)** and **Qini Curve**. Stratified sampling is also crucial during validation splits.
 
 3. **Observed Uplift**:
-   - Treatment Conversion Rate: **~0.307%**
-   - Control Conversion Rate: **~0.182%**
-   - **Absolute Uplift**: **+0.125%**
+   - Treatment Conversion Rate: **~0.3089%**
+   - Control Conversion Rate: **~0.1938%**
+   - **Absolute Uplift**: **+0.1152 percentage points**
    - **Action**: The treatment shows a clear positive effect. Uplift modeling is feasible and can help identify the persuable segment.
 
 4. **Feature Characteristics**:

@@ -31,7 +31,7 @@ Fix:
 Ensure the MLflow command in `docker-compose.yml` includes:
 
 ```text
---allowed-hosts localhost,127.0.0.1,mlflow,mlflow:5000,0.0.0.0
+--allowed-hosts localhost:5000,127.0.0.1:5000,localhost,127.0.0.1,mlflow,mlflow:5000
 ```
 
 ## MLflow model not found
@@ -149,3 +149,18 @@ create_app(model=FakeUpliftModel(), enable_decision_logging=False)
 ```
 
 Do not let unit tests depend on live MLflow or PostgreSQL services.
+
+## Local test dependencies are missing
+
+If test collection reports missing packages such as `mlflow` or `prometheus_client`, install the project dependencies:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+For a clean, reproducible environment, run the test suite inside the Docker jobs image:
+
+```powershell
+docker compose build jobs
+docker compose run --rm --no-deps jobs pytest tests -q
+```

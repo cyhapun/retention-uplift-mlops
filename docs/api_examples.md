@@ -92,6 +92,8 @@ Expected metrics:
 - `retentionops_uplift_score`
 - `retentionops_expected_incremental_value`
 
+Decision requests are also written to PostgreSQL when `ENABLE_DECISION_LOGGING=true` (the Docker Compose default). Use `ENABLE_DECISION_LOGGING=false` for isolated API tests that do not need a database.
+
 ## Common Validation Error
 
 If a required feature is missing:

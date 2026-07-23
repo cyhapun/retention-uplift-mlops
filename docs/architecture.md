@@ -9,20 +9,26 @@ The system estimates whether a user should receive an intervention by comparing 
 ```text
 Raw Criteo Uplift Data
 → Data Pipeline
-→ EDA
-→ Baseline Response Model
-→ T-Learner Uplift Model
-→ MLflow Model Registry
-→ FastAPI Decision Service
-→ Business Policy Engine
-→ PostgreSQL Decision Logs
-→ Feedback Simulation
-→ Monitoring and Drift Detection
+→ Processed Dataset
+├─→ EDA and Baseline Response Model
+└─→ T-Learner Uplift Model
+   → Evaluation → MLflow Model Registry
+   → FastAPI Decision Service → Policy Engine
+   → PostgreSQL decision_logs
+   → Delayed Feedback Simulation
+   → PostgreSQL feedback_logs
+
+FastAPI /metrics → Prometheus → Grafana
+Reference + Current Data → Evidently → Manual Retrain Signal
 ```
 
 ## Diagrams
 
 Diagrams are stored in the `diagrams/` directory.
+
+The corrected end-to-end diagram is also embedded in the root [README](../README.md):
+
+![RetentionOps end-to-end pipeline](../diagrams/retentionops_pipeline_corrected.png)
 
 ### High-Level Architecture
 
@@ -44,16 +50,17 @@ flowchart TD
     K --> L[Policy Engine]
     L --> M[Recommended Action]
 
-    K --> N[PostgreSQL Decision Logs]
+    K --> N[PostgreSQL: decision_logs]
     N --> O[Delayed Feedback Simulation]
-    O --> P[Feedback Logs]
+    O --> P[PostgreSQL: feedback_logs]
 
     K --> Q[Prometheus Metrics]
     Q --> R[Grafana Dashboard]
 
     D --> S[Evidently Drift Detection]
     C --> S
-    S --> T[Retraining Signal]
+    S --> T[Manual Retraining Signal]
+    T --> G
 
     U[GitHub Actions CI] --> V[Lint / Test / Docker Build]
     W[Docker Compose] --> X[Local MLOps Stack]
@@ -63,7 +70,7 @@ flowchart TD
 
 ### Data Pipeline
 
-The data pipeline reads the raw Criteo uplift dataset, samples across the full file, validates schema, and creates train, validation, test, and reference datasets.
+The data pipeline reads the raw Criteo uplift dataset, samples across the full file, validates schema, and creates train, validation, test, and reference datasets. The reference file is a snapshot of the training data used by drift reports; it is not a second production dataset.
 
 Important design choice:
 
@@ -150,6 +157,8 @@ and generates:
 - drift report
 - feature-level drift summary
 - retraining signal
+
+The current implementation reports a retraining recommendation; it does not automatically launch a new training run. The default retraining rule fires when dataset drift is detected, when more than 30% of features are drifted, or when critical features are configured as drifted.
 
 ### Local Stack
 
