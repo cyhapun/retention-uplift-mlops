@@ -52,6 +52,20 @@ docker compose build
 .\scripts\docker-smoke-test.ps1
 ```
 
+Docker persistence:
+
+- PostgreSQL data is stored in the `postgres_data` named volume.
+- MLflow metadata and artifacts are stored in the `mlflow_data` named volume.
+- Do not use `docker compose down -v` unless you intend to remove these volumes.
+
+To migrate an existing local `mlflow.db` and `mlruns/` into the Docker volume before starting the stack:
+
+```powershell
+.\scripts\docker-migrate-mlflow-volume.ps1
+```
+
+The migration refuses to overwrite a non-empty volume. The original local files are preserved as a backup.
+
 ## URLs
 
 | Service | URL |
