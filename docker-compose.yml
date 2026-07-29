@@ -27,13 +27,14 @@ services:
       mlflow server
       --host 0.0.0.0
       --port 5000
-      --backend-store-uri ${MLFLOW_BACKEND_STORE_URI:-sqlite:////app/mlflow.db}
-      --default-artifact-root ${MLFLOW_ARTIFACT_ROOT:-file:///app/mlruns}
+      --backend-store-uri ${MLFLOW_BACKEND_STORE_URI:-sqlite:////var/lib/mlflow/mlflow.db}
+      --default-artifact-root ${MLFLOW_ARTIFACT_ROOT:-file:///var/lib/mlflow/mlruns}
       --allowed-hosts localhost:5000,127.0.0.1:5000,localhost,127.0.0.1,mlflow,mlflow:5000
     ports:
       - "5000:5000"
     volumes:
       - .:/app
+      - mlflow_data:/var/lib/mlflow
     environment:
       PYTHONPATH: /app
     healthcheck:
@@ -142,5 +143,6 @@ services:
     restart: unless-stopped
 
 volumes:
+  mlflow_data:
   postgres_data:
   grafana_data:
