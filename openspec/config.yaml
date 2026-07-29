@@ -1,0 +1,61 @@
+schema: spec-driven
+
+context: |
+  Project: RetentionOps, an end-to-end MLOps system for retention decisioning.
+
+  Domain:
+    - Estimate incremental treatment effect rather than response propensity.
+    - Recommend retention interventions based on uplift, customer value, treatment cost, and ROI.
+    - Supported actions are no_action, low_cost_email, standard_discount, and premium_offer.
+
+  Technology stack:
+    - Python 3.11 with pandas, scikit-learn, XGBoost, LightGBM, SQLAlchemy, FastAPI, and Pydantic.
+    - MLflow for experiment tracking and model registry.
+    - PostgreSQL for decision_logs and feedback_logs.
+    - Prometheus and Grafana for service monitoring.
+    - Evidently for data drift reports and manual retraining recommendations.
+    - Docker Compose for the local MLOps stack; Docker Desktop is the primary development runtime.
+
+  Architecture:
+    - The data pipeline samples the full Criteo uplift CSV to preserve treatment/control representation.
+    - It creates interim samples, train/validation/test datasets, and a reference dataset.
+    - The uplift model is a T-Learner with separate treatment and control response models.
+    - The registered serving model is uplift_model@champion in MLflow.
+    - FastAPI loads the registered model, runs the policy engine, logs decisions, and exposes Prometheus metrics.
+    - Delayed feedback simulation reads decision logs and writes simulated feedback logs.
+    - Drift detection compares reference data with current or simulated data and emits a manual retraining signal.
+    - Drift detection must not automatically start model training unless a future change explicitly adds that behavior.
+
+  Runtime and persistence:
+    - Docker services are postgres, mlflow, api, jobs, prometheus, and grafana.
+    - PostgreSQL data is persisted in the postgres_data named volume.
+    - MLflow metadata and artifacts are persisted in the mlflow_data named volume.
+    - Grafana state is persisted in the grafana_data named volume.
+    - The repository is bind-mounted into application/job containers at /app for local development.
+    - Do not use docker compose down -v unless deleting persistent data is intentional.
+    - The local SQLite files mlflow.db, mlruns/, and retentionops.db are not required for Docker runtime.
+
+  Repository conventions:
+    - Use Conventional Commits for commit messages.
+    - Keep application code under src/, tests under tests/, operational scripts under scripts/, and documentation under docs/.
+    - Prefer small, focused changes and preserve existing user data and generated artifacts unless removal is explicitly requested.
+    - Use configuration and environment variables for runtime-specific settings; do not commit .env or generated datasets/models.
+    - Keep policy behavior configuration-driven through src/policy/policy_config.yaml.
+    - Use PowerShell-compatible deployment scripts for the Windows development environment when appropriate.
+
+  Quality gates:
+    - Run ruff check src tests.
+    - Run ruff format src tests --check.
+    - Run pytest tests -q.
+    - Validate Docker with docker compose config and docker compose build.
+    - For stack changes, verify service health endpoints and the Docker Compose service status.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
