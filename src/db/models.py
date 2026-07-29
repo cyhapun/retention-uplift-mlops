@@ -65,6 +65,34 @@ class FeedbackLog(Base):
     decision_log: Mapped[DecisionLog] = relationship(back_populates="feedback_logs")
 
 
+class OperationRun(Base):
+    __tablename__ = "operation_runs"
+
+    operation_id: Mapped[str] = mapped_column(String, primary_key=True)
+    operation: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    actor: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    command_summary: Mapped[str] = mapped_column(String, nullable=False)
+    created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at = mapped_column(DateTime(timezone=True), nullable=True)
+    exit_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tail: Mapped[str | None] = mapped_column(String, nullable=True)
+    error_summary: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class OperationAudit(Base):
+    __tablename__ = "operation_audits"
+
+    audit_id: Mapped[str] = mapped_column(String, primary_key=True)
+    operation_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    operation: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    actor: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    outcome: Mapped[str] = mapped_column(String, nullable=False)
+    created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 Index("idx_decision_logs_created_action", DecisionLog.created_at, DecisionLog.recommended_action)
 Index("idx_feedback_logs_observed_at", FeedbackLog.observed_at)
 Index("idx_feedback_logs_user_outcome", FeedbackLog.user_id, FeedbackLog.observed_outcome)
