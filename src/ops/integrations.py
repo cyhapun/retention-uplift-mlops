@@ -150,8 +150,8 @@ def _result_value(result: list[dict]) -> float | None:
 
 def get_metrics() -> dict:
     expressions = {
-        "request_rate": 'sum(rate(retentionops_api_requests_total[5m]))',
-        "error_rate": 'sum(rate(retentionops_api_errors_total[5m]))',
+        "request_rate": "sum(rate(retentionops_api_requests_total[5m]))",
+        "error_rate": "sum(rate(retentionops_api_errors_total[5m]))",
         "average_uplift": (
             "sum(rate(retentionops_uplift_score_sum[5m])) "
             "/ sum(rate(retentionops_uplift_score_count[5m]))"
@@ -186,9 +186,7 @@ def get_database_summary() -> dict:
             observed_outcome_rate = session.scalar(func.avg(FeedbackLog.observed_outcome))
             realized_value = session.scalar(func.sum(FeedbackLog.realized_value)) or 0.0
             recent_decisions = session.scalars(
-                select(DecisionLog)
-                .order_by(DecisionLog.created_at.desc())
-                .limit(5)
+                select(DecisionLog).order_by(DecisionLog.created_at.desc()).limit(5)
             ).all()
             return {
                 "decision_count": int(decision_count),
