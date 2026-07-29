@@ -96,11 +96,16 @@ The bootstrap sequence initializes PostgreSQL, optionally builds the sampled dat
 
 The Control Center at `http://localhost:3000` aggregates service health, model readiness, decision history, feedback summaries, Prometheus metrics, drift reports, and links to MLflow/Grafana. The browser talks only to the web origin; PostgreSQL, Prometheus, MLflow, and the operations runner remain behind the server-side `ops` service.
 
+The interface is organized into Overview, Decisions, Monitoring, Operations, and Policy areas. See
+[`docs/control-center.md`](docs/control-center.md) for the operator language, drift explanation, policy workflow,
+and rollback procedure.
+
 Read-only dashboard access works without extra configuration. The operation buttons are disabled by the control plane unless an admin token is configured in `.env`:
 
 ```dotenv
 OPS_ADMIN_TOKEN=use-a-local-secret
 OPS_JOB_TIMEOUT_SECONDS=3600
+POLICY_STORE_ENABLED=true
 ```
 
 Supported operations are fixed and allowlisted: `train-uplift`, `register-uplift`, `drift-report`, `simulate-drift`, and `simulate-feedback`. Only one operation can run at a time. Jobs are persisted in the PostgreSQL `operation_runs` table and stale `queued`/`running` jobs are marked failed after an `ops` restart. The web and ops containers never mount the Docker socket.
