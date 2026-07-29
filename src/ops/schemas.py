@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from src.policy.schemas import PolicyAuditResponse, PolicySnapshot
+
 
 class ServiceStatus(BaseModel):
     name: str
@@ -54,3 +56,8 @@ class OperationResponse(BaseModel):
     exit_code: int | None = None
     output_tail: str | None = None
     error_summary: str | None = None
+
+
+class PolicyHistoryResponse(BaseModel):
+    versions: list[PolicySnapshot]
+    audits: list[PolicyAuditResponse]

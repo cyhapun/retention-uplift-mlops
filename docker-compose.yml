@@ -67,6 +67,7 @@ services:
       UPLIFT_MODEL_ALIAS: ${UPLIFT_MODEL_ALIAS:-champion}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://retentionops:retentionops@postgres:5432/retentionops}
       ENABLE_DECISION_LOGGING: ${ENABLE_DECISION_LOGGING:-true}
+      POLICY_STORE_ENABLED: ${POLICY_STORE_ENABLED:-true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -134,6 +135,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://retentionops:retentionops@postgres:5432/retentionops}
       OPS_ADMIN_TOKEN: ${OPS_ADMIN_TOKEN:-}
       OPS_JOB_TIMEOUT_SECONDS: ${OPS_JOB_TIMEOUT_SECONDS:-3600}
+      POLICY_STORE_ENABLED: ${POLICY_STORE_ENABLED:-true}
     depends_on:
       postgres:
         condition: service_healthy

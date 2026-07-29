@@ -1,7 +1,9 @@
 ## Purpose
 
 Provide a single Dockerized operator entrypoint for the RetentionOps uplift platform while keeping specialist tools available through deep links.
-## Requirements
+
+## MODIFIED Requirements
+
 ### Requirement: Unified dashboard entrypoint
 
 The system SHALL provide a Dockerized Next.js Control Center as the primary operator-facing entrypoint for the RetentionOps stack, with task-oriented navigation for Overview, Decisions, Monitoring, Operations, and Policy.

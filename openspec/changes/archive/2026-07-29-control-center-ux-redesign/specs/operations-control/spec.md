@@ -1,7 +1,9 @@
 ## Purpose
 
 Provide a safe, authenticated control plane for running named RetentionOps MLOps operations without exposing arbitrary shell or Docker host control.
-## Requirements
+
+## MODIFIED Requirements
+
 ### Requirement: Allowlisted operations
 
 The operations control plane SHALL expose only named, allowlisted MLOps operations and SHALL reject arbitrary shell commands, arbitrary module paths, and unrecognized arguments.

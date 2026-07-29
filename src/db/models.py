@@ -93,6 +93,33 @@ class OperationAudit(Base):
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class PolicyVersion(Base):
+    __tablename__ = "policy_versions"
+
+    version_id: Mapped[str] = mapped_column(String, primary_key=True)
+    version_number: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
+    config: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_by: Mapped[str] = mapped_column(String, nullable=False)
+    created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+    activated_at = mapped_column(DateTime(timezone=True), nullable=True)
+    is_active: Mapped[bool] = mapped_column(default=False, index=True, nullable=False)
+    parent_version_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    change_summary: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class PolicyAudit(Base):
+    __tablename__ = "policy_audits"
+
+    audit_id: Mapped[str] = mapped_column(String, primary_key=True)
+    action: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    actor: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    outcome: Mapped[str] = mapped_column(String, nullable=False)
+    source_version_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    target_version_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 Index("idx_decision_logs_created_action", DecisionLog.created_at, DecisionLog.recommended_action)
 Index("idx_feedback_logs_observed_at", FeedbackLog.observed_at)
 Index("idx_feedback_logs_user_outcome", FeedbackLog.user_id, FeedbackLog.observed_outcome)
