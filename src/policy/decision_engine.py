@@ -1,4 +1,4 @@
-from src.policy.config import PolicyConfig, load_policy_config
+from src.policy.config import PolicyConfig, load_active_policy_config
 
 
 def calculate_expected_value(
@@ -82,7 +82,7 @@ def recommend_action_from_policy(
     - expected incremental value is above the action threshold
     """
     if policy_config is None:
-        policy_config = load_policy_config()
+        policy_config = load_active_policy_config()
 
     if customer_value <= 0:
         raise ValueError("customer_value must be greater than 0.")

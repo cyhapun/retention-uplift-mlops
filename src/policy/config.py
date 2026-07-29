@@ -48,3 +48,14 @@ def load_policy_config(path: str | Path = DEFAULT_POLICY_CONFIG_PATH) -> PolicyC
         min_uplift_for_action=float(thresholds.get("min_uplift_for_action", 0.0)),
         max_daily_budget=float(thresholds.get("max_daily_budget", 0.0)),
     )
+
+
+def load_active_policy_config() -> PolicyConfig:
+    """Load one complete active policy, falling back to the checked-in YAML seed."""
+    try:
+        from src.policy.store import get_active_policy
+
+        config, _version = get_active_policy()
+        return config
+    except Exception:
+        return load_policy_config()

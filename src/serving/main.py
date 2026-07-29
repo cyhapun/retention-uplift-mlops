@@ -11,6 +11,7 @@ from src.data.constants import FEATURE_COLS
 from src.db.database import SessionLocal, init_database
 from src.db.repository import create_decision_log
 from src.policy.decision_engine import recommend_action_from_policy
+from src.policy.store import ensure_policy_seed
 from src.serving.metrics import metrics_response, prometheus_middleware, record_decision_metrics
 from src.serving.model_loader import (
     DEFAULT_MODEL_ALIAS,
@@ -78,6 +79,7 @@ def create_app(
 
         if app.state.enable_decision_logging:
             init_database()
+            ensure_policy_seed()
 
         if model is not None:
             app.state.model = model
