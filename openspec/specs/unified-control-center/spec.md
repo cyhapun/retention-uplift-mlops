@@ -1,22 +1,21 @@
 ## Purpose
 
 Provide a single Dockerized operator entrypoint for the RetentionOps uplift platform while keeping specialist tools available through deep links.
-
 ## Requirements
-
 ### Requirement: Unified dashboard entrypoint
 
-The system SHALL provide a Dockerized Next.js Control Center as the primary operator-facing entrypoint for the RetentionOps stack.
+The system SHALL provide a Dockerized Next.js Control Center as the primary operator-facing entrypoint for the RetentionOps stack, with task-oriented navigation for Overview, Decisions, Monitoring, Operations, and Policy.
 
 #### Scenario: Operator opens the control center
 
 - **WHEN** an operator navigates to the configured web entrypoint
-- **THEN** the system SHALL render a dashboard without requiring the operator to open separate service UIs for the core overview
+- **THEN** the system SHALL render the Overview task without requiring the operator to open separate service UIs for the core overview
 - **AND** the dashboard SHALL identify the current environment and refresh state
+- **AND** the operator SHALL be able to reach the other task views from the same shell
 
 ### Requirement: Service health overview
 
-The Control Center SHALL display the health and availability of the API, PostgreSQL, MLflow, Prometheus, Grafana, and operations services.
+The Control Center SHALL display the health and availability of the API, PostgreSQL, MLflow, Prometheus, Grafana, and operations services using readable service names and actionable status descriptions.
 
 #### Scenario: All services are healthy
 
@@ -28,12 +27,12 @@ The Control Center SHALL display the health and availability of the API, Postgre
 
 - **WHEN** a configured service health check fails or times out
 - **THEN** the dashboard SHALL show that service as unavailable
-- **AND** SHALL display a non-sensitive failure reason or timeout state
+- **AND** SHALL display a non-sensitive failure reason or timeout state in natural language
 - **AND** SHALL keep the rest of the dashboard available when possible
 
 ### Requirement: Model status and specialist links
 
-The Control Center SHALL display the loaded model name, alias, version or run identifier, and model-loaded state using the configured MLflow/API integrations.
+The Control Center SHALL display the loaded model name, alias, version or run identifier, and model-loaded state using the configured MLflow/API integrations, while presenting technical references as secondary details.
 
 #### Scenario: Champion model is loaded
 
@@ -49,35 +48,37 @@ The Control Center SHALL display the loaded model name, alias, version or run id
 
 ### Requirement: Decision playground
 
-The Control Center SHALL provide a form for submitting a valid decision request to FastAPI and SHALL present the decision response in business-readable terms.
+The Control Center SHALL provide a form for submitting a valid decision request to FastAPI and SHALL present the decision response in business-readable terms with progressive disclosure for technical references.
 
 #### Scenario: Successful decision request
 
-- **WHEN** an operator submits a valid user ID, customer value, and feature payload
+- **WHEN** an operator submits a valid user reference, estimated customer value, and feature payload
 - **THEN** the dashboard SHALL call the decision API
-- **AND** SHALL show treatment probability, control probability, uplift score, expected incremental value, ROI, recommended action, and decision reason
-- **AND** SHALL display the decision identifier
+- **AND** SHALL show treatment probability, control probability, uplift score, expected incremental value, ROI, recommended action, and decision reason with plain-language explanations
+- **AND** SHALL make the decision identifier available as a secondary technical reference
 
 #### Scenario: Invalid decision request
 
-- **WHEN** required features or customer values are missing or invalid
-- **THEN** the dashboard SHALL show field-level or API validation feedback
+- **WHEN** required features or estimated customer value are missing or invalid
+- **THEN** the dashboard SHALL show field-level or API validation feedback in natural language
 - **AND** SHALL not display the result as a successful decision
 
 ### Requirement: Monitoring and drift summary
 
-The Control Center SHALL display selected Prometheus metrics and the latest drift/retraining summary without requiring direct browser access to Prometheus or the report filesystem.
+The Control Center SHALL display selected Prometheus metrics and the latest drift/retraining summary without requiring direct browser access to Prometheus or the report filesystem, and SHALL explain the operational meaning of the values.
 
 #### Scenario: Dashboard refreshes metrics
 
 - **WHEN** the configured refresh interval elapses
 - **THEN** the dashboard SHALL request bounded metric data through the server-side integration
 - **AND** SHALL render request rate, latency, error rate, action distribution, average uplift, and expected value when data is available
+- **AND** SHALL show metric names and units in readable language
 
 #### Scenario: Latest drift report exists
 
 - **WHEN** a valid drift summary is available
 - **THEN** the dashboard SHALL show drifted feature count, drift share, retraining recommendation, and retraining reasons
+- **AND** SHALL explain that drift is a change in input-data distribution compared with the reference data
 - **AND** SHALL provide a link to the detailed report when configured
 
 ### Requirement: Server-side integration boundary

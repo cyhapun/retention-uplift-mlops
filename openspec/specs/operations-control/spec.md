@@ -1,9 +1,7 @@
 ## Purpose
 
 Provide a safe, authenticated control plane for running named RetentionOps MLOps operations without exposing arbitrary shell or Docker host control.
-
 ## Requirements
-
 ### Requirement: Allowlisted operations
 
 The operations control plane SHALL expose only named, allowlisted MLOps operations and SHALL reject arbitrary shell commands, arbitrary module paths, and unrecognized arguments.
@@ -47,29 +45,36 @@ The control plane SHALL persist job identity, operation, status, timestamps, exi
 
 ### Requirement: Authorization for mutating operations
 
-The control plane SHALL require an explicitly configured admin authorization mechanism for mutating operations and SHALL keep those operations disabled when authorization is not configured.
+The control plane SHALL require an explicitly configured admin authorization mechanism for job operations and policy creation, activation, and rollback, and SHALL keep those mutating operations disabled when authorization is not configured.
 
-#### Scenario: Authorized operator starts a job
+#### Scenario: Authorized operator starts a job or changes policy
 
 - **WHEN** a request includes valid admin authorization
-- **THEN** the control plane SHALL authorize the operation
-- **AND** SHALL record the operator identity in the job audit data
+- **THEN** the control plane SHALL authorize the requested mutating operation
+- **AND** SHALL record the operator identity in the relevant audit data
 
-#### Scenario: Unauthorized operator starts a job
+#### Scenario: Unauthorized operator starts a job or changes policy
 
 - **WHEN** a request lacks valid admin authorization
 - **THEN** the control plane SHALL return an authorization error
 - **AND** SHALL not create or start a job
+- **AND** SHALL not change the active policy
 
 ### Requirement: Audit trail
 
-The control plane SHALL record accepted and rejected mutating operations with actor, operation, request time, status, and outcome metadata.
+The control plane SHALL record accepted and rejected mutating operations, including jobs and policy changes, with actor, operation, request time, status, and outcome metadata.
 
 #### Scenario: Operation is audited
 
 - **WHEN** an authorized operation is accepted or a protected operation is rejected
 - **THEN** an audit record SHALL be created without storing secrets or full credentials
 - **AND** the record SHALL be queryable by an authorized operator
+
+#### Scenario: Policy transition is audited
+
+- **WHEN** a policy is activated or rolled back
+- **THEN** the audit record SHALL include the source and resulting policy version
+- **AND** SHALL include the validation and confirmation outcome
 
 ### Requirement: No Docker host control from the UI
 
@@ -83,10 +88,16 @@ The web application and browser SHALL not receive access to the Docker socket or
 
 ### Requirement: Operational safety
 
-The control plane SHALL enforce single-operation concurrency or an explicit configured queue policy and SHALL prevent duplicate destructive operations from being started concurrently.
+The control plane SHALL enforce single-operation concurrency or an explicit configured queue policy, SHALL prevent duplicate destructive operations from being started concurrently, and SHALL prevent lost updates to the active policy.
 
 #### Scenario: Duplicate operation is submitted
 
 - **WHEN** an equivalent operation is already running and the configured policy disallows duplicates
 - **THEN** the control plane SHALL reject or safely deduplicate the new request
 - **AND** SHALL explain the existing job identifier to the operator
+
+#### Scenario: Concurrent policy update is submitted
+
+- **WHEN** a policy update is based on an outdated active-version identifier
+- **THEN** the control plane SHALL reject activation as a concurrent update
+- **AND** SHALL leave the current active policy unchanged
