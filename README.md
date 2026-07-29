@@ -66,20 +66,53 @@ To migrate an existing local `mlflow.db` and `mlruns/` into the Docker volume be
 
 The migration refuses to overwrite a non-empty volume. The original local files are preserved as a backup.
 
+If a volume was migrated by an older version of this project and the API reports an MLflow artifact path such as `/app/mlruns`, repair only the metadata paths with:
+
+```powershell
+docker compose down
+.\scripts\docker-repair-mlflow-paths.ps1
+docker compose up -d
+```
+
+The repair creates a timestamped `mlflow.db` backup inside the same named volume and does not remove model artifacts.
+
 ## URLs
 
 | Service | URL |
 |---------|-----|
+| RetentionOps Control Center | http://localhost:3000 |
 | MLflow | http://localhost:5000 |
 | FastAPI docs | http://localhost:8000/docs |
 | Prometheus | http://localhost:9090 |
-| Grafana | http://localhost:3000 |
+| Grafana | http://localhost:3001 |
 
 Grafana login:
 
 - `admin` / `admin`
 
 The bootstrap sequence initializes PostgreSQL, optionally builds the sampled datasets, trains the uplift model, registers `uplift_model@champion`, starts FastAPI, and optionally starts Prometheus/Grafana.
+
+## Control Center operations
+
+The Control Center at `http://localhost:3000` aggregates service health, model readiness, decision history, feedback summaries, Prometheus metrics, drift reports, and links to MLflow/Grafana. The browser talks only to the web origin; PostgreSQL, Prometheus, MLflow, and the operations runner remain behind the server-side `ops` service.
+
+Read-only dashboard access works without extra configuration. The operation buttons are disabled by the control plane unless an admin token is configured in `.env`:
+
+```dotenv
+OPS_ADMIN_TOKEN=use-a-local-secret
+OPS_JOB_TIMEOUT_SECONDS=3600
+```
+
+Supported operations are fixed and allowlisted: `train-uplift`, `register-uplift`, `drift-report`, `simulate-drift`, and `simulate-feedback`. Only one operation can run at a time. Jobs are persisted in the PostgreSQL `operation_runs` table and stale `queued`/`running` jobs are marked failed after an `ops` restart. The web and ops containers never mount the Docker socket.
+
+To roll back the Control Center without affecting data, stop the new services and restore the previous Grafana host mapping if needed:
+
+```powershell
+docker compose stop web ops
+docker compose rm -f web ops
+```
+
+Do not use `docker compose down -v`; the PostgreSQL, MLflow, and Grafana named volumes are intentionally preserved.
 
 ## Verified Results
 
