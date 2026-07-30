@@ -2,11 +2,17 @@ import os
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import select
 
 from src.db.database import SessionLocal, init_database
-from src.db.models import OperationAudit, OperationRun
+from src.db.models import OperationAudit, OperationRun, SimulationPredictionRun, SimulationRun
+from src.monitoring.simulate_drift import (
+    DriftSimulationRequest,
+    DriftSimulationSummary,
+    DriftTransformation,
+)
 from src.ops.integrations import (
     get_database_summary,
     get_drift_summary,
@@ -16,7 +22,21 @@ from src.ops.integrations import (
     get_service_health,
 )
 from src.ops.runner import ALLOWED_OPERATIONS, OperationRunner
-from src.ops.schemas import OperationResponse, PolicyHistoryResponse
+from src.ops.schemas import (
+    OperationResponse,
+    PolicyHistoryResponse,
+    SimulationListResponse,
+    SimulationPredictionListResponse,
+    SimulationPredictionResponse,
+    SimulationResponse,
+)
+from src.ops.simulation_prediction import (
+    PredictionComparisonSummary,
+    PredictionModelReference,
+    SimulationPredictionRequest,
+)
+from src.ops.simulation_prediction_service import SimulationPredictionService
+from src.ops.simulation_service import SimulationService
 from src.policy.schemas import (
     PolicyActivationRequest,
     PolicyAuditResponse,
@@ -81,14 +101,101 @@ def _require_admin(authorization: str | None) -> str:
     return "admin"
 
 
+def _simulation_response(run: SimulationRun) -> SimulationResponse:
+    transformations = [
+        DriftTransformation.model_validate(item)
+        for item in run.request_payload.get("transformations", [])
+    ]
+    summary = (
+        DriftSimulationSummary.model_validate(run.summary_payload) if run.summary_payload else None
+    )
+    downloads = []
+    if run.status == "succeeded":
+        downloads = [
+            {
+                "format": "parquet",
+                "url": f"/api/simulations/{run.simulation_id}/download?format=parquet",
+            },
+            {"format": "csv", "url": f"/api/simulations/{run.simulation_id}/download?format=csv"},
+        ]
+    return SimulationResponse(
+        simulation_id=run.simulation_id,
+        actor=run.actor,
+        status=run.status,
+        preset=run.preset,
+        rows=run.rows,
+        transformations=transformations,
+        summary=summary,
+        created_at=run.created_at,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+        expires_at=run.expires_at,
+        error_summary=run.error_summary,
+        downloads=downloads,
+    )
+
+
+def _prediction_response(run: SimulationPredictionRun) -> SimulationPredictionResponse:
+    request = SimulationPredictionRequest.model_validate(
+        {
+            key: value
+            for key, value in run.request_payload.items()
+            if key in {"mode", "customer_value"}
+        }
+    )
+    model = (
+        PredictionModelReference.model_validate(run.model_reference)
+        if run.model_reference
+        else None
+    )
+    summary = (
+        PredictionComparisonSummary.model_validate(run.summary_payload)
+        if run.summary_payload
+        else None
+    )
+    downloads = []
+    if run.status == "succeeded":
+        downloads = [
+            {
+                "format": "parquet",
+                "url": f"/api/simulation-predictions/{run.prediction_id}/download?format=parquet",
+            },
+            {
+                "format": "csv",
+                "url": f"/api/simulation-predictions/{run.prediction_id}/download?format=csv",
+            },
+        ]
+    return SimulationPredictionResponse(
+        prediction_id=run.prediction_id,
+        simulation_id=run.simulation_id,
+        actor=run.actor,
+        status=run.status,
+        request=request,
+        model=model,
+        summary=summary,
+        created_at=run.created_at,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+        expires_at=run.expires_at,
+        error_summary=run.error_summary,
+        downloads=downloads,
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_database()
     ensure_policy_seed()
     app.state.runner = OperationRunner()
     app.state.runner.reconcile_stale_jobs()
+    app.state.simulations = SimulationService()
+    app.state.simulations.initialize()
+    app.state.predictions = SimulationPredictionService(app.state.simulations)
+    app.state.predictions.initialize()
     yield
     app.state.runner.shutdown()
+    app.state.predictions.shutdown()
+    app.state.simulations.shutdown()
 
 
 app = FastAPI(
@@ -303,3 +410,155 @@ def start_operation(
         operation_id=operation_run.operation_id,
     )
     return _as_response(operation_run)
+
+
+@app.post("/simulations", response_model=SimulationResponse, status_code=202)
+def create_simulation(
+    request: DriftSimulationRequest,
+    authorization: str | None = Header(default=None),
+):
+    actor = _require_admin(authorization)
+    try:
+        run = app.state.simulations.create(request, actor)
+    except RuntimeError as exc:
+        _record_audit("simulate-drift", actor, "rejected", str(exc))
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        _record_audit("simulate-drift", actor, "rejected", str(exc))
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _simulation_response(run)
+
+
+@app.get("/simulations", response_model=SimulationListResponse)
+def list_simulations(
+    limit: int = 25,
+    authorization: str | None = Header(default=None),
+):
+    actor = _require_admin(authorization)
+    return SimulationListResponse(
+        items=[_simulation_response(run) for run in app.state.simulations.list(actor, limit)]
+    )
+
+
+@app.get("/simulations/{simulation_id}", response_model=SimulationResponse)
+def get_simulation(
+    simulation_id: str,
+    authorization: str | None = Header(default=None),
+):
+    actor = _require_admin(authorization)
+    run = app.state.simulations.get(simulation_id)
+    if run is None or run.actor != actor:
+        raise HTTPException(status_code=404, detail="Simulation not found.")
+    return _simulation_response(run)
+
+
+@app.get("/simulations/{simulation_id}/download")
+def download_simulation(
+    simulation_id: str,
+    format: str = Query(default="parquet", pattern="^(parquet|csv)$"),
+    authorization: str | None = Header(default=None),
+):
+    actor = _require_admin(authorization)
+    try:
+        run = app.state.simulations.get(simulation_id)
+        if run is None or run.actor != actor:
+            raise LookupError("Simulation not found.")
+        if format == "csv":
+            run, payload = app.state.simulations.csv_bytes(simulation_id)
+            return Response(
+                content=payload,
+                media_type="text/csv; charset=utf-8",
+                headers={
+                    "Content-Disposition": (
+                        f'attachment; filename="drift-simulation-{simulation_id}.csv"'
+                    )
+                },
+            )
+        run, path = app.state.simulations.download_path(simulation_id)
+        return FileResponse(
+            path,
+            media_type="application/vnd.apache.parquet",
+            filename=f"drift-simulation-{simulation_id}.parquet",
+        )
+    except (LookupError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post(
+    "/simulations/{simulation_id}/predict",
+    response_model=SimulationPredictionResponse,
+    status_code=202,
+)
+def create_simulation_prediction(
+    simulation_id: str,
+    request: SimulationPredictionRequest,
+    authorization: str | None = Header(default=None),
+):
+    actor = _require_admin(authorization)
+    try:
+        run = app.state.predictions.create(simulation_id, actor, request)
+    except LookupError as exc:
+        _record_audit("simulate-drift-prediction", actor, "rejected", str(exc), simulation_id)
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        _record_audit("simulate-drift-prediction", actor, "rejected", str(exc), simulation_id)
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        _record_audit("simulate-drift-prediction", actor, "rejected", str(exc), simulation_id)
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _prediction_response(run)
+
+
+@app.get("/simulation-predictions", response_model=SimulationPredictionListResponse)
+def list_simulation_predictions(
+    limit: int = 25,
+    authorization: str | None = Header(default=None),
+):
+    actor = _require_admin(authorization)
+    return SimulationPredictionListResponse(
+        items=[_prediction_response(run) for run in app.state.predictions.list(actor, limit)]
+    )
+
+
+@app.get("/simulation-predictions/{prediction_id}", response_model=SimulationPredictionResponse)
+def get_simulation_prediction(
+    prediction_id: str,
+    authorization: str | None = Header(default=None),
+):
+    actor = _require_admin(authorization)
+    run = app.state.predictions.get(prediction_id)
+    if run is None or run.actor != actor:
+        raise HTTPException(status_code=404, detail="Prediction run not found.")
+    return _prediction_response(run)
+
+
+@app.get("/simulation-predictions/{prediction_id}/download")
+def download_simulation_prediction(
+    prediction_id: str,
+    format: str = Query(default="parquet", pattern="^(parquet|csv)$"),
+    authorization: str | None = Header(default=None),
+):
+    actor = _require_admin(authorization)
+    try:
+        run = app.state.predictions.get(prediction_id)
+        if run is None or run.actor != actor:
+            raise LookupError("Prediction run not found.")
+        if format == "csv":
+            _run, payload = app.state.predictions.csv_bytes(prediction_id)
+            return Response(
+                content=payload,
+                media_type="text/csv; charset=utf-8",
+                headers={
+                    "Content-Disposition": (
+                        f'attachment; filename="simulation-predictions-{prediction_id}.csv"'
+                    )
+                },
+            )
+        _run, path = app.state.predictions.download_path(prediction_id)
+        return FileResponse(
+            path,
+            media_type="application/vnd.apache.parquet",
+            filename=f"simulation-predictions-{prediction_id}.parquet",
+        )
+    except (LookupError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

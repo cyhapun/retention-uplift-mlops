@@ -1,12 +1,13 @@
 # Control Center operator guide
 
-The Control Center at `http://localhost:3000` is the single operator entrypoint for the local RetentionOps stack. It keeps specialist tools available, but groups the everyday workflow into five task areas:
+The Control Center at `http://localhost:3000` is the single operator entrypoint for the local RetentionOps stack. It keeps specialist tools available, but groups the everyday workflow into six task areas:
 
 | Area | Use it for |
 | --- | --- |
 | Overview | Check service health, model readiness, recent decisions, and key signals. |
 | Decisions | Test a customer profile and understand the recommended retention action. |
-| Monitoring | Review API traffic, service health, and input-data drift. |
+| Monitoring | Review API traffic and production drift signals. |
+| Simulation Lab | Create synthetic drift, compare champion predictions before and after it, and download temporary paired results. |
 | Operations | Start only approved training, registration, drift, or feedback jobs. |
 | Policy | Review, preview, activate, and roll back decision rules. |
 
@@ -22,7 +23,34 @@ Technical references, decision IDs, model run references, and bounded job diagno
 
 ## Drift language
 
-Drift means that recent customer input data has a different distribution from the reference data used to assess the model. It is a monitoring signal, not proof that the model is broken and not an automatic retraining command. Use the Monitoring page to inspect the affected attributes, then use Operations to run a report or retraining workflow when the team has reviewed the signal.
+Drift means that recent customer input data has a different distribution from the reference data used to assess the model. It is a monitoring signal, not proof that the model is broken and not an automatic retraining command. Production drift is shown separately from Simulation Lab.
+
+## Simulation Lab
+
+Use Simulation Lab when you need a controlled demonstration or test dataset:
+
+1. Choose a small, moderate, or large change, or open the advanced controls to select individual customer attributes.
+2. Choose the number of test records and run the scenario.
+3. When the synthetic data is ready, choose **Model-only comparison** to compare predicted uplift, or **Include recommendation comparison** to also compare policy recommendations.
+4. For recommendation comparison, provide an **Illustrative customer value**. This is a business assumption for the test only; it is not learned by the model and does not change production policy.
+5. Review before/after uplift, changed recommendations, action distribution, expected value, and ROI when enabled. Download the paired Parquet or CSV result if needed.
+
+Simulation Lab results are temporary and isolated. They do not create production decisions, decision logs, feedback records, Prometheus production metrics, retraining jobs, or production drift reports. They are stored in the simulation Docker volume until expiry and use synthetic row identifiers.
+The simulator reads the configured baseline but never changes it, starts training, registers a model, or creates a production drift report. Generated Parquet files are stored temporarily in the `drift_simulation_data` Docker volume. PostgreSQL stores only request metadata, summary, status, audit information, and expiry. Files are removed after `DRIFT_SIMULATION_RETENTION_SECONDS`; an expired download is not recreated automatically.
+
+The current feature names are shown as **Customer attribute 1–11** because the model data dictionary has not assigned business names yet. Percentage changes multiply an attribute's values; fixed shifts add the specified amount.
+
+To initialize the metadata table and run cleanup explicitly:
+
+```powershell
+docker compose exec ops python -m src.db.migrate_simulations
+```
+
+The command is safe to repeat and does not remove PostgreSQL, MLflow, Grafana, or dataset volumes.
+
+## Explicit production drift analysis
+
+Simulation is intentionally separate from production analysis. If a generated artifact needs formal drift analysis, an operator must explicitly provide that artifact to the existing `src.monitoring.drift_report` workflow. The simulator does not expose raw HTML/JSON reports in its primary UI and does not treat a test scenario as evidence about production.
 
 ## Policy management
 

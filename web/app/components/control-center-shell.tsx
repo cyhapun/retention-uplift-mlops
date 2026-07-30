@@ -7,6 +7,7 @@ export const NAV_ITEMS = [
   { href: "/", label: "Overview", hint: "Platform at a glance" },
   { href: "/decisions", label: "Decisions", hint: "Test a retention action" },
   { href: "/monitoring", label: "Monitoring", hint: "Watch health and drift" },
+  { href: "/simulation-lab", label: "Simulation Lab", hint: "Run what-if predictions" },
   { href: "/operations", label: "Operations", hint: "Run safe MLOps jobs" },
   { href: "/policy", label: "Policy", hint: "Manage decision rules" },
 ] as const;
