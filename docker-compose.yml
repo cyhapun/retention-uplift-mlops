@@ -120,6 +120,7 @@ services:
     volumes:
       - .:/app
       - mlflow_data:/var/lib/mlflow
+      - drift_simulation_data:/var/lib/retentionops/simulations
     environment:
       PYTHONPATH: /app
       APP_ENV: ${APP_ENV:-local}
@@ -135,6 +136,11 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://retentionops:retentionops@postgres:5432/retentionops}
       OPS_ADMIN_TOKEN: ${OPS_ADMIN_TOKEN:-}
       OPS_JOB_TIMEOUT_SECONDS: ${OPS_JOB_TIMEOUT_SECONDS:-3600}
+      DRIFT_SIMULATION_BASELINE_PATH: ${DRIFT_SIMULATION_BASELINE_PATH:-data/processed/test.parquet}
+      DRIFT_SIMULATION_ARTIFACT_ROOT: ${DRIFT_SIMULATION_ARTIFACT_ROOT:-/var/lib/retentionops/simulations}
+      DRIFT_SIMULATION_RETENTION_SECONDS: ${DRIFT_SIMULATION_RETENTION_SECONDS:-3600}
+      DRIFT_SIMULATION_MAX_FILE_BYTES: ${DRIFT_SIMULATION_MAX_FILE_BYTES:-52428800}
+      DRIFT_SIMULATION_MAX_CSV_BYTES: ${DRIFT_SIMULATION_MAX_CSV_BYTES:-104857600}
       POLICY_STORE_ENABLED: ${POLICY_STORE_ENABLED:-true}
     depends_on:
       postgres:
@@ -219,3 +225,4 @@ volumes:
   mlflow_data:
   postgres_data:
   grafana_data:
+  drift_simulation_data:
