@@ -39,7 +39,7 @@ jobs:
         run: docker compose build api jobs
 
       - name: Run tests inside jobs container
-        run: docker compose run --rm --no-deps jobs pytest tests -q
+        run: docker compose run --rm --no-deps -e DATABASE_URL=sqlite:///:memory: jobs pytest tests -q
 
       - name: Stop containers
         if: always()
