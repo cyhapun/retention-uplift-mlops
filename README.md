@@ -100,15 +100,16 @@ The interface is organized into Overview, Decisions, Monitoring, Operations, and
 [`docs/control-center.md`](docs/control-center.md) for the operator language, drift explanation, policy workflow,
 and rollback procedure.
 
-Read-only dashboard access works without extra configuration. The operation buttons are disabled by the control plane unless an admin token is configured in `.env`:
+Read-only dashboard access works without extra configuration. The local Compose profile uses the demo token `demo-admin` unless you replace it in `.env`:
 
 ```dotenv
 OPS_ADMIN_TOKEN=use-a-local-secret
+DEMO_LOCAL_HISTORY=true
 OPS_JOB_TIMEOUT_SECONDS=3600
 POLICY_STORE_ENABLED=true
 ```
 
-Supported operations are fixed and allowlisted: `train-uplift`, `register-uplift`, `drift-report`, `simulate-drift`, and `simulate-feedback`. Only one operation can run at a time. Jobs are persisted in the PostgreSQL `operation_runs` table and stale `queued`/`running` jobs are marked failed after an `ops` restart. The web and ops containers never mount the Docker socket.
+Supported operations are fixed and allowlisted: `train-uplift`, `register-uplift`, `drift-report`, `simulate-drift`, and `simulate-feedback` (the last one remains available in durable mode). Only one operation can run at a time. With `DEMO_LOCAL_HISTORY=true`, job state is held in ops memory and compact browser history is kept in `localStorage`; policy versions remain durable in PostgreSQL. Set it to `false` for PostgreSQL-backed operation and decision history. The web and ops containers never mount the Docker socket.
 
 To roll back the Control Center without affecting data, stop the new services and restore the previous Grafana host mapping if needed:
 
