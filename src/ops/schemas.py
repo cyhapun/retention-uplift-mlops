@@ -1,7 +1,9 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from src.monitoring.simulate_drift import DriftSimulationSummary, DriftTransformation
 from src.policy.schemas import PolicyAuditResponse, PolicySnapshot
 
 
@@ -56,6 +58,32 @@ class OperationResponse(BaseModel):
     exit_code: int | None = None
     output_tail: str | None = None
     error_summary: str | None = None
+
+
+class SimulationDownload(BaseModel):
+    format: Literal["parquet", "csv"]
+    url: str
+    available: bool = True
+
+
+class SimulationResponse(BaseModel):
+    simulation_id: str
+    actor: str
+    status: str
+    preset: str | None
+    rows: int
+    transformations: list[DriftTransformation]
+    summary: DriftSimulationSummary | None = None
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    expires_at: datetime | None = None
+    error_summary: str | None = None
+    downloads: list[SimulationDownload] = Field(default_factory=list)
+
+
+class SimulationListResponse(BaseModel):
+    items: list[SimulationResponse]
 
 
 class PolicyHistoryResponse(BaseModel):
