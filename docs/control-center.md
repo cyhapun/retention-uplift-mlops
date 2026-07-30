@@ -6,7 +6,7 @@ The Control Center at `http://localhost:3000` is the single operator entrypoint 
 | --- | --- |
 | Overview | Check service health, model readiness, recent decisions, and key signals. |
 | Decisions | Test a customer profile and understand the recommended retention action. |
-| Monitoring | Review API traffic, service health, and input-data drift. |
+| Monitoring | Review API traffic, production drift, and create temporary test scenarios. |
 | Operations | Start only approved training, registration, drift, or feedback jobs. |
 | Policy | Review, preview, activate, and roll back decision rules. |
 
@@ -22,7 +22,32 @@ Technical references, decision IDs, model run references, and bounded job diagno
 
 ## Drift language
 
-Drift means that recent customer input data has a different distribution from the reference data used to assess the model. It is a monitoring signal, not proof that the model is broken and not an automatic retraining command. Use the Monitoring page to inspect the affected attributes, then use Operations to run a report or retraining workflow when the team has reviewed the signal.
+Drift means that recent customer input data has a different distribution from the reference data used to assess the model. It is a monitoring signal, not proof that the model is broken and not an automatic retraining command. Production drift is shown separately from the Drift Simulator.
+
+## Drift Simulator
+
+Use the Monitoring page's **Create a safe test scenario** panel when you need a controlled demonstration or test dataset:
+
+1. Choose a small, moderate, or large change, or open the advanced controls to select individual customer attributes.
+2. Choose the number of test records and run the scenario.
+3. Review the plain-language summary, including affected attributes, before/after averages, severity, and expiry.
+4. Download Parquet for data tooling or CSV for quick inspection when needed.
+
+The simulator reads the configured baseline but never changes it, starts training, registers a model, or creates a production drift report. Generated Parquet files are stored temporarily in the `drift_simulation_data` Docker volume. PostgreSQL stores only request metadata, summary, status, audit information, and expiry. Files are removed after `DRIFT_SIMULATION_RETENTION_SECONDS`; an expired download is not recreated automatically.
+
+The current feature names are shown as **Customer attribute 1–11** because the model data dictionary has not assigned business names yet. Percentage changes multiply an attribute's values; fixed shifts add the specified amount.
+
+To initialize the metadata table and run cleanup explicitly:
+
+```powershell
+docker compose exec ops python -m src.db.migrate_simulations
+```
+
+The command is safe to repeat and does not remove PostgreSQL, MLflow, Grafana, or dataset volumes.
+
+## Explicit production drift analysis
+
+Simulation is intentionally separate from production analysis. If a generated artifact needs formal drift analysis, an operator must explicitly provide that artifact to the existing `src.monitoring.drift_report` workflow. The simulator does not expose raw HTML/JSON reports in its primary UI and does not treat a test scenario as evidence about production.
 
 ## Policy management
 
