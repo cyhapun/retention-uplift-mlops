@@ -4,6 +4,11 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from src.monitoring.simulate_drift import DriftSimulationSummary, DriftTransformation
+from src.ops.simulation_prediction import (
+    PredictionComparisonSummary,
+    PredictionModelReference,
+    SimulationPredictionRequest,
+)
 from src.policy.schemas import PolicyAuditResponse, PolicySnapshot
 
 
@@ -84,6 +89,32 @@ class SimulationResponse(BaseModel):
 
 class SimulationListResponse(BaseModel):
     items: list[SimulationResponse]
+
+
+class SimulationPredictionDownload(BaseModel):
+    format: Literal["parquet", "csv"]
+    url: str
+    available: bool = True
+
+
+class SimulationPredictionResponse(BaseModel):
+    prediction_id: str
+    simulation_id: str
+    actor: str
+    status: str
+    request: SimulationPredictionRequest
+    model: PredictionModelReference | None = None
+    summary: PredictionComparisonSummary | None = None
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    expires_at: datetime | None = None
+    error_summary: str | None = None
+    downloads: list[SimulationPredictionDownload] = Field(default_factory=list)
+
+
+class SimulationPredictionListResponse(BaseModel):
+    items: list[SimulationPredictionResponse]
 
 
 class PolicyHistoryResponse(BaseModel):

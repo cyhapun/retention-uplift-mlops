@@ -54,6 +54,18 @@ class SimulationConfig:
             minimum=1024,
             maximum=500 * 1024 * 1024,
         )
+        self.prediction_batch_size = _bounded_int(
+            "DRIFT_SIMULATION_PREDICTION_BATCH_SIZE", 10_000, minimum=100, maximum=50_000
+        )
+        self.max_prediction_rows = _bounded_int(
+            "DRIFT_SIMULATION_MAX_PREDICTION_ROWS", 100_000, minimum=1, maximum=100_000
+        )
+        self.max_prediction_file_bytes = _bounded_int(
+            "DRIFT_SIMULATION_MAX_PREDICTION_FILE_BYTES",
+            100 * 1024 * 1024,
+            minimum=1024,
+            maximum=500 * 1024 * 1024,
+        )
 
 
 def _bounded_int(name: str, default: int, minimum: int, maximum: int) -> int:

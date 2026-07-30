@@ -112,6 +112,31 @@ class SimulationRun(Base):
     error_summary: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
+class SimulationPredictionRun(Base):
+    __tablename__ = "simulation_prediction_runs"
+
+    prediction_id: Mapped[str] = mapped_column(String, primary_key=True)
+    simulation_id: Mapped[str] = mapped_column(
+        String, ForeignKey("simulation_runs.simulation_id"), index=True, nullable=False
+    )
+    actor: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    mode: Mapped[str] = mapped_column(String, nullable=False)
+    customer_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    request_payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    model_reference: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    policy_version_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    policy_config_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    summary_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    artifact_filename: Mapped[str | None] = mapped_column(String, nullable=True)
+    artifact_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at = mapped_column(DateTime(timezone=True), nullable=False)
+    error_summary: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
 class PolicyVersion(Base):
     __tablename__ = "policy_versions"
 
