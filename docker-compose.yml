@@ -92,6 +92,7 @@ services:
     volumes:
       - .:/app
       - mlflow_data:/var/lib/mlflow
+      - reports_data:/var/lib/retentionops/reports
     environment:
       PYTHONPATH: /app
       MLFLOW_TRACKING_URI: http://mlflow:5000
@@ -99,6 +100,7 @@ services:
       UPLIFT_MODEL_ALIAS: ${UPLIFT_MODEL_ALIAS:-champion}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://retentionops:retentionops@postgres:5432/retentionops}
       ENABLE_DECISION_LOGGING: ${ENABLE_DECISION_LOGGING:-true}
+      RETENTIONOPS_REPORT_ROOT: /var/lib/retentionops/reports
     depends_on:
       postgres:
         condition: service_healthy
@@ -121,6 +123,7 @@ services:
       - .:/app
       - mlflow_data:/var/lib/mlflow
       - drift_simulation_data:/var/lib/retentionops/simulations
+      - reports_data:/var/lib/retentionops/reports
     environment:
       PYTHONPATH: /app
       APP_ENV: ${APP_ENV:-local}
@@ -147,6 +150,7 @@ services:
       DRIFT_SIMULATION_PREDICTION_BATCH_SIZE: ${DRIFT_SIMULATION_PREDICTION_BATCH_SIZE:-10000}
       DRIFT_SIMULATION_MAX_PREDICTION_ROWS: ${DRIFT_SIMULATION_MAX_PREDICTION_ROWS:-100000}
       DRIFT_SIMULATION_MAX_PREDICTION_FILE_BYTES: ${DRIFT_SIMULATION_MAX_PREDICTION_FILE_BYTES:-104857600}
+      RETENTIONOPS_REPORT_ROOT: /var/lib/retentionops/reports
       POLICY_STORE_ENABLED: ${POLICY_STORE_ENABLED:-true}
     depends_on:
       postgres:
@@ -232,3 +236,4 @@ volumes:
   postgres_data:
   grafana_data:
   drift_simulation_data:
+  reports_data:

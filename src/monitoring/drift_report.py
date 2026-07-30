@@ -7,11 +7,12 @@ import pandas as pd
 
 from src.data.constants import FEATURE_COLS
 from src.monitoring.retrain_check import should_retrain
+from src.runtime_paths import DRIFT_REPORT_ROOT
 
 REFERENCE_PATH = Path("data/reference/reference.parquet")
 CURRENT_PATH = Path("data/processed/test.parquet")
 DRIFTED_PATH = Path("data/processed/test_drifted.parquet")
-REPORT_DIR = Path("reports/drift")
+REPORT_DIR = DRIFT_REPORT_ROOT
 
 
 def load_feature_data(path: str | Path, sample_size: int | None = 100_000) -> pd.DataFrame:

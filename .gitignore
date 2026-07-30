@@ -31,7 +31,6 @@ artifacts/*
 
 # Reports
 reports/*
-!reports/.gitkeep
 
 # MLflow
 mlruns/

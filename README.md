@@ -121,7 +121,7 @@ Do not use `docker compose down -v`; the PostgreSQL, MLflow, and Grafana named v
 
 ## Verified Results
 
-The repository contains generated reports under `reports/` and model artifacts tracked by MLflow. The current reference results are:
+The runtime stores generated training and drift reports in the Docker `reports_data` named volume; the source tree remains free of report artifacts. The current reference results are:
 
 | Check | Result |
 |---|---:|
@@ -142,10 +142,10 @@ Generated outputs include:
 - `data/reference/reference.parquet`
 - `artifacts/uplift/treatment_model.pkl`
 - `artifacts/uplift/control_model.pkl`
-- `reports/uplift/uplift_decile_report.csv`
-- `reports/uplift/qini_curve.csv`
-- `reports/drift/data_drift_report_summary.json`
-- `reports/drift/data_drift_report_drifted_summary.json`
+- `/var/lib/retentionops/reports/uplift/uplift_decile_report.csv`
+- `/var/lib/retentionops/reports/uplift/qini_curve.csv`
+- `/var/lib/retentionops/reports/drift/data_drift_report_summary.json`
+- `/var/lib/retentionops/reports/drift/data_drift_report_drifted_summary.json`
 
 ## Documentation
 
@@ -1072,13 +1072,13 @@ docker compose run --rm jobs python -m src.models.register_uplift_model
 
 This keeps MLflow artifact paths consistent across containers.
 
-Generated runtime files are not committed:
+Generated runtime files are stored outside the source tree:
 
 ```text
 mlflow.db
 mlruns/
 artifacts/
-reports/
+reports_data Docker volume
 data/processed/
 Docker volumes
 ```

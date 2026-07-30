@@ -2,7 +2,6 @@ import json
 import os
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 
 import httpx
 from sqlalchemy import func, select, text
@@ -12,9 +11,10 @@ from src.db.feedback_repository import get_feedback_summary_by_action
 from src.db.models import DecisionLog, FeedbackLog
 from src.db.repository import get_action_distribution, get_average_uplift_score
 from src.ops.schemas import DashboardOverview, DriftSummary, ModelSummary, ServiceStatus
+from src.runtime_paths import DRIFT_REPORT_ROOT
 
 REQUEST_TIMEOUT = float(os.getenv("OPS_UPSTREAM_TIMEOUT_SECONDS", "3"))
-DRIFT_SUMMARY_PATH = Path("reports/drift/data_drift_report_summary.json")
+DRIFT_SUMMARY_PATH = DRIFT_REPORT_ROOT / "data_drift_report_summary.json"
 
 
 def _public_url(name: str, default: str) -> str:

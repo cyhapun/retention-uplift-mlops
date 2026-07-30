@@ -16,9 +16,10 @@ from src.models.uplift_metrics import (
     uplift_decile_report,
     uplift_summary_metrics,
 )
+from src.runtime_paths import UPLIFT_REPORT_ROOT
 
 MODEL_DIR = Path("artifacts/uplift")
-REPORT_DIR = Path("reports/uplift")
+REPORT_DIR = UPLIFT_REPORT_ROOT
 
 TREATMENT_MODEL_PATH = MODEL_DIR / "treatment_model.pkl"
 CONTROL_MODEL_PATH = MODEL_DIR / "control_model.pkl"
