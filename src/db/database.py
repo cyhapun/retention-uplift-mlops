@@ -4,7 +4,7 @@ from collections.abc import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-DEFAULT_DATABASE_URL = "sqlite:///./retentionops.db"
+DEFAULT_DATABASE_URL = "sqlite:///:memory:"
 
 DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
 
