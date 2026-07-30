@@ -338,6 +338,7 @@ h2 { font-size: 1.06rem; letter-spacing: -.025em; }
 .service-row .service-detail, .job-row small { color: #788eaa; }
 .status-dot { height: 7px; width: 7px; }
 .model-status { border-radius: 10px; padding: 12px; }
+.model-status + .panel-description { margin: 12px 0 18px; }
 .technical-details-body { background: rgba(3, 12, 24, .5); }
 
 label { color: #9bb0c9; font-size: .76rem; }
