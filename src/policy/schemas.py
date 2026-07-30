@@ -22,6 +22,7 @@ class PolicySnapshot(BaseModel):
     created_at: datetime | None = None
     activated_at: datetime | None = None
     created_by: str
+    is_active: bool = False
     editable: bool
     policy: PolicyDocument
 
@@ -45,6 +46,11 @@ class PolicyPreviewRequest(BaseModel):
 
 
 class PolicyRollbackRequest(BaseModel):
+    expected_version_id: str | None = None
+    confirm: bool = False
+
+
+class PolicyVersionDeleteRequest(BaseModel):
     expected_version_id: str | None = None
     confirm: bool = False
 

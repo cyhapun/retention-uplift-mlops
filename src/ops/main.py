@@ -47,10 +47,12 @@ from src.policy.schemas import (
     PolicyRollbackRequest,
     PolicySnapshot,
     PolicyValidationResponse,
+    PolicyVersionDeleteRequest,
 )
 from src.policy.store import (
     PolicyConflictError,
     activate_policy,
+    delete_policy_version,
     ensure_policy_seed,
     get_policy_snapshot,
     list_policy_audits,
@@ -252,6 +254,7 @@ def _policy_snapshot_response() -> PolicySnapshot:
         created_at=version.created_at if version else None,
         activated_at=version.activated_at if version else None,
         created_by=version.created_by if version else "yaml-fallback",
+        is_active=version.is_active if version else True,
         editable=policy_store_enabled() and bool(os.getenv("OPS_ADMIN_TOKEN", "").strip()),
         policy=document,
     )
@@ -289,6 +292,7 @@ def policy_history(authorization: str | None = Header(default=None)):
             created_at=version.created_at,
             activated_at=version.activated_at,
             created_by=version.created_by,
+            is_active=version.is_active,
             editable=True,
             policy=PolicyDocument.model_validate(version.config),
         )
@@ -330,12 +334,13 @@ def activate_policy_endpoint(
         created_at=version.created_at,
         activated_at=version.activated_at,
         created_by=version.created_by,
+        is_active=version.is_active,
         editable=True,
         policy=request.policy,
     )
 
 
-@app.post("/policy/rollback/{version_id}", response_model=PolicySnapshot, status_code=201)
+@app.post("/policy/rollback/{version_id}", response_model=PolicySnapshot)
 def rollback_policy_endpoint(
     version_id: str,
     request: PolicyRollbackRequest,
@@ -360,9 +365,32 @@ def rollback_policy_endpoint(
         created_at=version.created_at,
         activated_at=version.activated_at,
         created_by=version.created_by,
+        is_active=version.is_active,
         editable=True,
         policy=PolicyDocument.model_validate(version.config),
     )
+
+
+@app.delete("/policy/versions/{version_id}", status_code=204)
+def delete_policy_version_endpoint(
+    version_id: str,
+    request: PolicyVersionDeleteRequest,
+    authorization: str | None = Header(default=None),
+):
+    actor = _require_admin(authorization)
+    try:
+        delete_policy_version(version_id, actor, request.expected_version_id, request.confirm)
+    except PolicyConflictError as exc:
+        record_policy_rejection("delete", actor, str(exc), request.expected_version_id)
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (ValueError, LookupError) as exc:
+        record_policy_rejection("delete", actor, str(exc), version_id)
+        status_code = 422 if isinstance(exc, ValueError) else 404
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        record_policy_rejection("delete", actor, str(exc), version_id)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return Response(status_code=204)
 
 
 @app.get("/operations", response_model=list[OperationResponse])

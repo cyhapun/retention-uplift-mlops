@@ -50,11 +50,13 @@ test("responsive and accessible UX contracts are present", async () => {
 
 test("policy workflow exposes validation, preview, activation, and rollback", async () => {
   const page = await read("app/components/policy-page.tsx");
-  for (const endpoint of ["/api/policy/validate", "/api/policy/preview", "/api/policy/activate", "/api/policy/rollback/"]) {
+  for (const endpoint of ["/api/policy/validate", "/api/policy/preview", "/api/policy/activate", "/api/policy/rollback/", "/api/policy/versions/"]) {
     assert.ok(page.includes(endpoint));
   }
   assert.ok(page.includes("Read-only mode"));
   assert.ok(page.includes("Preview impact"));
+  assert.ok(page.includes("View rules"));
+  assert.ok(page.includes("Delete"));
 });
 
 test("drift simulator exposes guided controls and download routes", async () => {

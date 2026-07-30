@@ -202,20 +202,79 @@ def rollback_policy(
 ) -> PolicyVersion:
     if not policy_store_enabled():
         raise RuntimeError("Policy persistence is not configured.")
+    if not confirm:
+        raise ValueError("Explicit confirmation is required before rolling back a policy.")
     with SessionLocal() as session:
+        active = session.scalar(
+            select(PolicyVersion).where(PolicyVersion.is_active.is_(True)).with_for_update()
+        )
+        actual_id = active.version_id if active else None
+        if expected_version_id is not None and expected_version_id != actual_id:
+            raise PolicyConflictError("The active policy changed. Reload it before rolling back.")
         target = session.get(PolicyVersion, version_id)
         if target is None:
             raise LookupError("Policy version not found.")
-        document = PolicyDocument.model_validate(target.config)
-    return activate_policy(
-        document=document,
-        actor=actor,
-        expected_version_id=expected_version_id,
-        confirm=confirm,
-        change_summary=f"Rolled back to policy version {target.version_number}.",
-        action="rollback",
-        source_version_id=version_id,
-    )
+        if target.is_active:
+            raise ValueError(f"Policy version {target.version_number} is already active.")
+        if active:
+            active.is_active = False
+        target.is_active = True
+        target.activated_at = datetime.now(timezone.utc)
+        if not demo_local_history_enabled():
+            session.add(
+                PolicyAudit(
+                    audit_id=str(uuid4()),
+                    action="rollback",
+                    actor=actor,
+                    status="accepted",
+                    outcome=f"Reactivated policy version {target.version_number}.",
+                    source_version_id=actual_id,
+                    target_version_id=target.version_id,
+                )
+            )
+        session.commit()
+        session.refresh(target)
+        return target
+
+
+def delete_policy_version(
+    version_id: str,
+    actor: str,
+    expected_version_id: str | None,
+    confirm: bool,
+) -> None:
+    if not policy_store_enabled():
+        raise RuntimeError("Policy persistence is not configured.")
+    if not confirm:
+        raise ValueError("Explicit confirmation is required before deleting a policy version.")
+    with SessionLocal() as session:
+        active = session.scalar(
+            select(PolicyVersion).where(PolicyVersion.is_active.is_(True)).with_for_update()
+        )
+        actual_id = active.version_id if active else None
+        if expected_version_id is not None and expected_version_id != actual_id:
+            raise PolicyConflictError(
+                "The active policy changed. Reload before deleting a version."
+            )
+        target = session.get(PolicyVersion, version_id)
+        if target is None:
+            raise LookupError("Policy version not found.")
+        if target.is_active:
+            raise ValueError("The active policy version cannot be deleted.")
+        version_number = target.version_number
+        session.delete(target)
+        if not demo_local_history_enabled():
+            session.add(
+                PolicyAudit(
+                    audit_id=str(uuid4()),
+                    action="delete",
+                    actor=actor,
+                    status="accepted",
+                    outcome=f"Deleted policy version {version_number}.",
+                    source_version_id=version_id,
+                )
+            )
+        session.commit()
 
 
 def list_policy_versions(limit: int = 25) -> list[PolicyVersion]:
