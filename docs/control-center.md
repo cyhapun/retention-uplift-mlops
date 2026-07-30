@@ -36,7 +36,7 @@ Use Simulation Lab when you need a controlled demonstration or test dataset:
 5. Review before/after uplift, changed recommendations, action distribution, expected value, and ROI when enabled. Download the paired Parquet or CSV result if needed.
 
 Simulation Lab results are temporary and isolated. They do not create production decisions, decision logs, feedback records, Prometheus production metrics, retraining jobs, or production drift reports. They are stored in the simulation Docker volume until expiry and use synthetic row identifiers.
-The simulator reads the configured baseline but never changes it, starts training, registers a model, or creates a production drift report. Generated Parquet files are stored temporarily in the `drift_simulation_data` Docker volume. PostgreSQL stores only request metadata, summary, status, audit information, and expiry. Files are removed after `DRIFT_SIMULATION_RETENTION_SECONDS`; an expired download is not recreated automatically.
+The simulator reads the configured baseline but never changes it, starts training, registers a model, or creates a production drift report. Generated Parquet files are stored temporarily in the `drift_simulation_data` Docker volume. In the default local demo mode, PostgreSQL is not used for decision, feedback, operation, simulation, or prediction history; only policy versions remain durable. Files are removed after `DRIFT_SIMULATION_RETENTION_SECONDS`; an expired download is not recreated automatically.
 
 The current feature names are shown as **Customer attribute 1–11** because the model data dictionary has not assigned business names yet. Percentage changes multiply an attribute's values; fixed shifts add the specified amount.
 
@@ -69,7 +69,15 @@ OPS_ADMIN_TOKEN=use-a-local-secret
 POLICY_STORE_ENABLED=true
 ```
 
-PostgreSQL stores immutable policy versions and audit records. A proposed version can be validated and previewed against recent decision logs before activation. Every activation creates a new version, and rollback creates a new transition to the selected prior configuration. If the policy store is not initialized, the Control Center shows the YAML configuration as read-only fallback.
+PostgreSQL stores immutable policy versions. In durable mode it also stores policy audit records. A proposed version can be validated and previewed against recent decision logs before activation. Every activation creates a new version, and rollback creates a new transition to the selected prior configuration. If the policy store is not initialized, the Control Center shows the YAML configuration as read-only fallback.
+
+## Demo-local history
+
+The Docker Compose default sets `DEMO_LOCAL_HISTORY=true`. Compact decision summaries, synthetic feedback, and completed Simulation Lab summaries are stored in `localStorage` for the current browser profile only. Raw features, credentials, logs, Parquet files, and CSV files are never placed in browser storage. The store is versioned, bounded, and safe to clear from the Decisions or Simulation Lab page.
+
+This history disappears when the browser site data is cleared, when the operator changes browser profiles, or when the server is restarted before an active simulation completes. Download files remain temporary server artifacts and can expire independently of the browser summary. Set `DEMO_LOCAL_HISTORY=false` to use the existing PostgreSQL-backed durable operation and result history path; this is the mode to use when testing production-like audit behavior.
+
+Synthetic feedback is a demonstration of the delayed-outcome workflow. It is generated from saved decision summaries and must not be interpreted as observed customer behavior.
 
 ## Deployment safety
 

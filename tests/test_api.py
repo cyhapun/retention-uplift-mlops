@@ -97,3 +97,19 @@ def test_metrics_endpoint_returns_prometheus_payload():
     assert response.status_code == 200
     assert "text/plain" in response.headers["content-type"]
     assert "retentionops_api_requests_total" in response.text
+
+
+def test_demo_local_mode_skips_decision_persistence(monkeypatch):
+    monkeypatch.setenv("DEMO_LOCAL_HISTORY", "true")
+
+    def fail_if_called(**_kwargs):
+        raise AssertionError("demo-local decisions must not be persisted")
+
+    monkeypatch.setattr("src.serving.main.create_decision_log", fail_if_called)
+    app = create_app(model=FakeUpliftModel(), enable_decision_logging=True)
+
+    with TestClient(app) as client:
+        response = client.post("/decide-action", json=make_payload())
+
+    assert response.status_code == 200
+    assert response.json()["recommended_action"] == "standard_discount"

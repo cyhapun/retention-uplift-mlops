@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from src.db.database import SessionLocal
 from src.db.models import OperationRun
+from src.demo_config import demo_local_history_enabled
 
 ALLOWED_OPERATIONS = {
     "train-uplift": ["python", "-m", "src.models.train_uplift_model"],
@@ -37,13 +38,17 @@ ALLOWED_OPERATIONS = {
 
 
 class OperationRunner:
-    def __init__(self) -> None:
+    def __init__(self, demo_local: bool | None = None) -> None:
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="retentionops-job")
         self.lock = Lock()
         self.timeout_seconds = int(os.getenv("OPS_JOB_TIMEOUT_SECONDS", "3600"))
+        self.demo_local = demo_local_history_enabled() if demo_local is None else demo_local
+        self._runs: dict[str, OperationRun] = {}
 
     def reconcile_stale_jobs(self) -> int:
         """Mark jobs from a previous control-plane process as unverified failures."""
+        if self.demo_local:
+            return 0
         reconciled = 0
         with SessionLocal() as session:
             stale_jobs = session.scalars(
@@ -64,11 +69,32 @@ class OperationRunner:
         self.executor.shutdown(wait=False, cancel_futures=False)
 
     def start(self, operation: str, actor: str) -> OperationRun:
+        if self.demo_local and operation == "simulate-feedback":
+            raise ValueError(
+                "Delayed feedback is simulated in the browser in demo-local history mode."
+            )
         command = ALLOWED_OPERATIONS.get(operation)
         if command is None:
             raise ValueError(f"Unsupported operation: {operation}")
 
         with self.lock:
+            if self.demo_local:
+                running = next(
+                    (item for item in self._runs.values() if item.status == "running"), None
+                )
+                if running is not None:
+                    raise RuntimeError(f"Operation already running: {running.operation_id}")
+                operation_run = OperationRun(
+                    operation_id=str(uuid4()),
+                    operation=operation,
+                    actor=actor,
+                    status="queued",
+                    command_summary=" ".join(command),
+                    created_at=datetime.now(timezone.utc),
+                )
+                self._runs[operation_run.operation_id] = operation_run
+                self.executor.submit(self._run, operation_run.operation_id, command)
+                return operation_run
             with SessionLocal() as session:
                 running = session.scalar(
                     select(OperationRun).where(OperationRun.status == "running")
@@ -92,6 +118,14 @@ class OperationRunner:
         return operation_run
 
     def _run(self, operation_id: str, command: list[str]) -> None:
+        if self.demo_local:
+            operation_run = self._runs.get(operation_id)
+            if operation_run is None:
+                return
+            operation_run.status = "running"
+            operation_run.started_at = datetime.now(timezone.utc)
+            self._run_process(operation_id, command)
+            return
         with SessionLocal() as session:
             operation_run = session.get(OperationRun, operation_id)
             if operation_run is None:
@@ -100,6 +134,9 @@ class OperationRunner:
             operation_run.started_at = datetime.now(timezone.utc)
             session.commit()
 
+        self._run_process(operation_id, command)
+
+    def _run_process(self, operation_id: str, command: list[str]) -> None:
         try:
             process = subprocess.run(
                 command,
@@ -144,6 +181,16 @@ class OperationRunner:
         output_tail: str,
         error_summary: str | None,
     ) -> None:
+        if self.demo_local:
+            operation_run = self._runs.get(operation_id)
+            if operation_run is None:
+                return
+            operation_run.status = status
+            operation_run.exit_code = exit_code
+            operation_run.output_tail = output_tail
+            operation_run.error_summary = error_summary
+            operation_run.finished_at = datetime.now(timezone.utc)
+            return
         with SessionLocal() as session:
             operation_run = session.get(OperationRun, operation_id)
             if operation_run is None:
@@ -154,3 +201,26 @@ class OperationRunner:
             operation_run.error_summary = error_summary
             operation_run.finished_at = datetime.now(timezone.utc)
             session.commit()
+
+    def list(self, actor: str | None = None, limit: int = 25) -> list[OperationRun]:
+        if not self.demo_local:
+            with SessionLocal() as session:
+                statement = (
+                    select(OperationRun).order_by(OperationRun.created_at.desc()).limit(limit)
+                )
+                if actor:
+                    statement = statement.where(OperationRun.actor == actor)
+                return list(session.scalars(statement).all())
+        items = list(self._runs.values())
+        if actor:
+            items = [item for item in items if item.actor == actor]
+        return sorted(items, key=lambda item: item.created_at or datetime.min, reverse=True)[:limit]
+
+    def get(self, operation_id: str) -> OperationRun | None:
+        if self.demo_local:
+            return self._runs.get(operation_id)
+        with SessionLocal() as session:
+            item = session.get(OperationRun, operation_id)
+            if item is not None:
+                session.expunge(item)
+            return item

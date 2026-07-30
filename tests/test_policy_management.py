@@ -78,7 +78,7 @@ def test_yaml_policy_can_be_converted_to_api_document():
     assert document.max_daily_budget == 10000
 
 
-def test_policy_activation_and_rollback_create_versions(monkeypatch):
+def test_policy_activation_rollback_reuses_and_deletes_versions(monkeypatch):
     monkeypatch.setenv("POLICY_STORE_ENABLED", "true")
     monkeypatch.setenv("OPS_ADMIN_TOKEN", "test-token")
 
@@ -115,5 +115,28 @@ def test_policy_activation_and_rollback_create_versions(monkeypatch):
                 "confirm": True,
             },
         )
-        assert rolled_back.status_code == 201
-        assert rolled_back.json()["version_number"] == activated.json()["version_number"] + 1
+        assert rolled_back.status_code == 200
+        assert rolled_back.json()["version_id"] == previous["version_id"]
+        assert rolled_back.json()["version_number"] == previous["version_number"]
+
+        active_delete = client.request(
+            "DELETE",
+            f"/policy/versions/{previous['version_id']}",
+            headers={"authorization": "Bearer test-token"},
+            json={"expected_version_id": previous["version_id"], "confirm": True},
+        )
+        assert active_delete.status_code == 422
+
+        deleted = client.request(
+            "DELETE",
+            f"/policy/versions/{activated.json()['version_id']}",
+            headers={"authorization": "Bearer test-token"},
+            json={"expected_version_id": previous["version_id"], "confirm": True},
+        )
+        assert deleted.status_code == 204
+
+        history = client.get("/policy/history", headers={"authorization": "Bearer test-token"})
+        assert all(
+            item["version_id"] != activated.json()["version_id"]
+            for item in history.json()["versions"]
+        )

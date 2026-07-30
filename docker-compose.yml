@@ -67,6 +67,7 @@ services:
       UPLIFT_MODEL_ALIAS: ${UPLIFT_MODEL_ALIAS:-champion}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://retentionops:retentionops@postgres:5432/retentionops}
       ENABLE_DECISION_LOGGING: ${ENABLE_DECISION_LOGGING:-true}
+      DEMO_LOCAL_HISTORY: ${DEMO_LOCAL_HISTORY:-true}
       POLICY_STORE_ENABLED: ${POLICY_STORE_ENABLED:-true}
     depends_on:
       postgres:
@@ -100,6 +101,7 @@ services:
       UPLIFT_MODEL_ALIAS: ${UPLIFT_MODEL_ALIAS:-champion}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://retentionops:retentionops@postgres:5432/retentionops}
       ENABLE_DECISION_LOGGING: ${ENABLE_DECISION_LOGGING:-true}
+      DEMO_LOCAL_HISTORY: ${DEMO_LOCAL_HISTORY:-true}
       RETENTIONOPS_REPORT_ROOT: /var/lib/retentionops/reports
     depends_on:
       postgres:
@@ -140,7 +142,8 @@ services:
       GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:-http://localhost:3001}
       WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-http://localhost:3000}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://retentionops:retentionops@postgres:5432/retentionops}
-      OPS_ADMIN_TOKEN: ${OPS_ADMIN_TOKEN:-}
+      OPS_ADMIN_TOKEN: ${OPS_ADMIN_TOKEN:-demo-admin}
+      DEMO_LOCAL_HISTORY: ${DEMO_LOCAL_HISTORY:-true}
       OPS_JOB_TIMEOUT_SECONDS: ${OPS_JOB_TIMEOUT_SECONDS:-3600}
       DRIFT_SIMULATION_BASELINE_PATH: ${DRIFT_SIMULATION_BASELINE_PATH:-data/processed/test.parquet}
       DRIFT_SIMULATION_ARTIFACT_ROOT: ${DRIFT_SIMULATION_ARTIFACT_ROOT:-/var/lib/retentionops/simulations}
@@ -178,7 +181,8 @@ services:
       NODE_ENV: production
       OPS_INTERNAL_URL: http://ops:8001
       API_INTERNAL_URL: http://api:8000
-      OPS_ADMIN_TOKEN: ${OPS_ADMIN_TOKEN:-}
+      OPS_ADMIN_TOKEN: ${OPS_ADMIN_TOKEN:-demo-admin}
+      NEXT_PUBLIC_DEMO_LOCAL_HISTORY: ${DEMO_LOCAL_HISTORY:-true}
     depends_on:
       ops:
         condition: service_healthy

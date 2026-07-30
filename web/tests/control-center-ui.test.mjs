@@ -20,6 +20,13 @@ test("all task routes are present", async () => {
   assert.ok(routes.every((route) => route.includes("Page")));
 });
 
+test("browser tab uses the RetentionOps icon", async () => {
+  const layout = await read("app/layout.tsx");
+  const icon = await read("app/icon.svg");
+  assert.ok(layout.includes('icon: "/icon.svg"'));
+  assert.ok(icon.includes("RetentionOps"));
+});
+
 test("navigation exposes active task links and specialist details", async () => {
   const shell = await read("app/components/control-center-shell.tsx");
   const presentation = await read("app/components/presentation.ts");
@@ -43,11 +50,13 @@ test("responsive and accessible UX contracts are present", async () => {
 
 test("policy workflow exposes validation, preview, activation, and rollback", async () => {
   const page = await read("app/components/policy-page.tsx");
-  for (const endpoint of ["/api/policy/validate", "/api/policy/preview", "/api/policy/activate", "/api/policy/rollback/"]) {
+  for (const endpoint of ["/api/policy/validate", "/api/policy/preview", "/api/policy/activate", "/api/policy/rollback/", "/api/policy/versions/"]) {
     assert.ok(page.includes(endpoint));
   }
   assert.ok(page.includes("Read-only mode"));
   assert.ok(page.includes("Preview impact"));
+  assert.ok(page.includes("View rules"));
+  assert.ok(page.includes("Delete"));
 });
 
 test("drift simulator exposes guided controls and download routes", async () => {
@@ -67,4 +76,25 @@ test("drift simulator exposes guided controls and download routes", async () => 
   assert.ok(simulator.includes("Run model comparison"));
   assert.ok(simulator.includes("Illustrative customer value"));
   assert.ok(simulator.includes("Download result (Parquet)"));
+});
+
+test("demo history is bounded, browser-only, and recoverable", async () => {
+  const history = await read("app/lib/demo-local-history.ts");
+  const hook = await read("app/hooks/use-demo-local-history.ts");
+  for (const contract of ["DEMO_HISTORY_STORAGE_KEY", "DEMO_HISTORY_VERSION", "localStorage", "200_000", "clearDemoHistory", "no longer supported", "quota"]) {
+    assert.ok(history.toLowerCase().includes(contract.toLowerCase()), `missing ${contract}`);
+  }
+  for (const contract of ["hydrated", "retentionops:demo-history-changed", "addDecision", "addFeedback", "addSimulation", "addPrediction", "clear"]) {
+    assert.ok(hook.includes(contract), `missing ${contract}`);
+  }
+});
+
+test("demo UI keeps history controls concise", async () => {
+  const decisions = await read("app/components/task-pages.tsx");
+  const simulator = await read("app/components/drift-simulator.tsx");
+  assert.ok(decisions.includes("They are not observed customer results"));
+  assert.ok(simulator.includes("Clear history"));
+  assert.ok(!simulator.includes("Browser-only history"));
+  assert.ok(decisions.includes("Clear decision history"));
+  assert.ok(!decisions.includes("This history belongs to this browser only"));
 });

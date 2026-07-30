@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 
 import { FEATURE_LABELS, actionLabel, formatNumber, reasonLabel, safeError } from "./presentation";
 import { Panel, PanelHeading, StatusMessage, TechnicalDetails } from "./control-center-shell";
+import { useDemoLocalHistory } from "../hooks/use-demo-local-history";
 
 const features = Array.from({ length: 11 }, (_, index) => `f${index}`);
 
@@ -30,6 +31,7 @@ export function DecisionForm({ modelReady, onCompleted }: { modelReady: boolean;
   const [decision, setDecision] = useState<Decision | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const { enabled, addDecision, warning } = useDemoLocalHistory();
 
   const submitDecision = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -49,6 +51,18 @@ export function DecisionForm({ modelReady, onCompleted }: { modelReady: boolean;
       const payload = await response.json();
       if (!response.ok) throw new Error(safeError(payload, "The decision could not be completed."));
       setDecision(payload);
+      if (enabled) {
+        addDecision({
+          decisionId: payload.decision_id,
+          userReference: payload.user_id,
+          createdAt: new Date().toISOString(),
+          customerValue: payload.customer_value,
+          recommendedAction: payload.recommended_action,
+          uplift: payload.uplift_score,
+          expectedValue: payload.expected_incremental_value,
+          roi: payload.roi,
+        });
+      }
       onCompleted?.();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The decision could not be completed.");
@@ -62,6 +76,7 @@ export function DecisionForm({ modelReady, onCompleted }: { modelReady: boolean;
     <p className="panel-description">Enter a customer profile to see which retention action is expected to create the most value.</p>
     {!modelReady && <StatusMessage kind="warning">The champion model is not ready yet. Decision testing will be enabled when the model is available.</StatusMessage>}
     {error && <StatusMessage kind="error">{error}</StatusMessage>}
+    {warning && <StatusMessage kind="warning">{warning}</StatusMessage>}
     <form onSubmit={submitDecision} className="form-stack">
       <label>Customer reference<input required value={form.userId} onChange={(event) => setForm({ ...form, userId: event.target.value })} aria-describedby="customer-reference-help" /></label>
       <p id="customer-reference-help" className="small muted">A reference used to find this decision later. It does not need to be a real name.</p>
