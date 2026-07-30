@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from src.data.constants import FEATURE_COLS
 from src.db.database import SessionLocal, init_database
 from src.db.repository import create_decision_log
+from src.demo_config import demo_local_history_enabled
 from src.policy.decision_engine import recommend_action_from_policy
 from src.policy.store import ensure_policy_seed
 from src.serving.metrics import metrics_response, prometheus_middleware, record_decision_metrics
@@ -72,14 +73,15 @@ def create_app(
             os.getenv("ENABLE_DECISION_LOGGING"),
             default=True,
         )
+    enable_decision_logging = enable_decision_logging and not demo_local_history_enabled()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.enable_decision_logging = enable_decision_logging
 
-        if app.state.enable_decision_logging:
-            init_database()
-            ensure_policy_seed()
+        # Policy versions remain durable even when demo result history is browser-local.
+        init_database()
+        ensure_policy_seed()
 
         if model is not None:
             app.state.model = model

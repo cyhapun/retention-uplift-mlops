@@ -188,3 +188,33 @@ def test_runner_records_successful_subprocess_transition(monkeypatch):
         assert finished["output_tail"] == "completed"
     finally:
         runner.shutdown()
+
+
+def test_demo_local_runner_does_not_open_a_database_session(monkeypatch):
+    monkeypatch.setattr(
+        "src.ops.runner.SessionLocal",
+        lambda: (_ for _ in ()).throw(AssertionError("demo-local jobs must not use PostgreSQL")),
+    )
+    monkeypatch.setattr(
+        "src.ops.runner.subprocess.run",
+        lambda *_args, **_kwargs: CompletedProcess(
+            args=["python", "-m", "demo"], returncode=0, stdout="completed", stderr=""
+        ),
+    )
+    runner = OperationRunner(demo_local=True)
+    try:
+        operation = runner.start("drift-report", "admin")
+        runner.executor.shutdown(wait=True)
+        assert operation.status == "succeeded"
+        assert runner.list()[0].operation_id == operation.operation_id
+    finally:
+        runner.shutdown()
+
+
+def test_demo_local_runner_moves_feedback_simulation_to_browser(monkeypatch):
+    runner = OperationRunner(demo_local=True)
+    try:
+        with pytest.raises(ValueError, match="simulated in the browser"):
+            runner.start("simulate-feedback", "admin")
+    finally:
+        runner.shutdown()

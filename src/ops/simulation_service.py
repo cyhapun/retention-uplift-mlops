@@ -14,6 +14,7 @@ from sqlalchemy import select
 
 from src.db.database import SessionLocal
 from src.db.models import OperationAudit, SimulationRun
+from src.demo_config import demo_local_history_enabled
 from src.monitoring.simulate_drift import (
     DriftSimulationRequest,
     DriftSimulationSummary,
@@ -83,6 +84,8 @@ class SimulationService:
             max_workers=1, thread_name_prefix="retentionops-simulation"
         )
         self.lock = Lock()
+        self.demo_local = demo_local_history_enabled()
+        self._runs: dict[str, SimulationRun] = {}
 
     def shutdown(self) -> None:
         self.executor.shutdown(wait=False, cancel_futures=False)
@@ -93,6 +96,8 @@ class SimulationService:
         self.cleanup_expired()
 
     def reconcile_stale_runs(self) -> int:
+        if self.demo_local:
+            return 0
         reconciled = 0
         with SessionLocal() as session:
             stale_runs = session.scalars(
@@ -113,6 +118,14 @@ class SimulationService:
     def cleanup_expired(self) -> int:
         expired = 0
         now = utc_now()
+        if self.demo_local:
+            for run in self._runs.values():
+                if run.status == "succeeded" and _utc_datetime(run.expires_at) <= now:
+                    self._remove_artifacts(run)
+                    run.status = "expired"
+                    run.finished_at = run.finished_at or now
+                    expired += 1
+            return expired
         with SessionLocal() as session:
             runs = session.scalars(
                 select(SimulationRun).where(
@@ -132,6 +145,33 @@ class SimulationService:
         transformations = request.resolved_transformations()
         with self.lock:
             self.cleanup_expired()
+            if self.demo_local:
+                active = next(
+                    (item for item in self._runs.values() if item.status in {"queued", "running"}),
+                    None,
+                )
+                if active is not None:
+                    raise RuntimeError(f"A simulation is already running: {active.simulation_id}")
+                simulation_id = str(uuid4())
+                created_at = utc_now()
+                run = SimulationRun(
+                    simulation_id=simulation_id,
+                    actor=actor,
+                    status="queued",
+                    preset=request.preset,
+                    rows=request.rows,
+                    request_payload={
+                        "preset": request.preset,
+                        "rows": request.rows,
+                        "transformations": [item.model_dump() for item in transformations],
+                    },
+                    artifact_filename=f"{simulation_id}.parquet",
+                    created_at=created_at,
+                    expires_at=created_at + timedelta(seconds=self.config.retention_seconds),
+                )
+                self._runs[simulation_id] = run
+                self.executor.submit(self._run, simulation_id, request)
+                return run
             with SessionLocal() as session:
                 active = session.scalar(
                     select(SimulationRun).where(SimulationRun.status.in_(["queued", "running"]))
@@ -174,6 +214,8 @@ class SimulationService:
 
     def get(self, simulation_id: str) -> SimulationRun | None:
         self.cleanup_expired()
+        if self.demo_local:
+            return self._runs.get(simulation_id)
         with SessionLocal() as session:
             run = session.get(SimulationRun, simulation_id)
             if run is None:
@@ -183,6 +225,11 @@ class SimulationService:
 
     def list(self, actor: str | None = None, limit: int = 25) -> list[SimulationRun]:
         self.cleanup_expired()
+        if self.demo_local:
+            runs = list(self._runs.values())
+            if actor:
+                runs = [run for run in runs if run.actor == actor]
+            return sorted(runs, key=lambda run: run.created_at or utc_now(), reverse=True)[:limit]
         with SessionLocal() as session:
             statement = select(SimulationRun).order_by(SimulationRun.created_at.desc())
             if actor:
@@ -218,6 +265,8 @@ class SimulationService:
         return run, payload
 
     def _record_download(self, run: SimulationRun) -> None:
+        if self.demo_local:
+            return
         with SessionLocal() as session:
             session.add(
                 OperationAudit(
@@ -232,6 +281,14 @@ class SimulationService:
             session.commit()
 
     def _run(self, simulation_id: str, request: DriftSimulationRequest) -> None:
+        if self.demo_local:
+            run = self._runs.get(simulation_id)
+            if run is None:
+                return
+            run.status = "running"
+            run.started_at = utc_now()
+            self._run_generation(simulation_id, request)
+            return
         with SessionLocal() as session:
             run = session.get(SimulationRun, simulation_id)
             if run is None:
@@ -240,6 +297,9 @@ class SimulationService:
             run.started_at = utc_now()
             session.commit()
 
+        self._run_generation(simulation_id, request)
+
+    def _run_generation(self, simulation_id: str, request: DriftSimulationRequest) -> None:
         final_path = self.config.artifact_root / f"{simulation_id}.parquet"
         temporary_path = self.config.artifact_root / f".{simulation_id}.parquet.tmp"
         try:
@@ -265,6 +325,15 @@ class SimulationService:
     def _finish_success(
         self, simulation_id: str, summary: DriftSimulationSummary, size: int
     ) -> None:
+        if self.demo_local:
+            run = self._runs.get(simulation_id)
+            if run is None:
+                return
+            run.status = "succeeded"
+            run.summary_payload = summary.model_dump()
+            run.artifact_size_bytes = size
+            run.finished_at = utc_now()
+            return
         with SessionLocal() as session:
             run = session.get(SimulationRun, simulation_id)
             if run is None:
@@ -276,6 +345,14 @@ class SimulationService:
             session.commit()
 
     def _finish_failure(self, simulation_id: str, message: str) -> None:
+        if self.demo_local:
+            run = self._runs.get(simulation_id)
+            if run is None:
+                return
+            run.status = "failed"
+            run.error_summary = message
+            run.finished_at = utc_now()
+            return
         with SessionLocal() as session:
             run = session.get(SimulationRun, simulation_id)
             if run is None:

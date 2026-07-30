@@ -16,6 +16,7 @@ from sqlalchemy import select
 
 from src.db.database import SessionLocal
 from src.db.models import OperationAudit, SimulationPredictionRun, SimulationRun
+from src.demo_config import demo_local_history_enabled
 from src.ops.simulation_prediction import (
     PredictionComparisonSummary,
     PredictionModelReference,
@@ -35,6 +36,8 @@ class SimulationPredictionService:
             max_workers=1, thread_name_prefix="retentionops-prediction"
         )
         self.lock = Lock()
+        self.demo_local = demo_local_history_enabled()
+        self._runs: dict[str, SimulationPredictionRun] = {}
 
     def shutdown(self) -> None:
         self.executor.shutdown(wait=False, cancel_futures=False)
@@ -45,6 +48,8 @@ class SimulationPredictionService:
         self.cleanup_expired()
 
     def reconcile_stale_runs(self) -> int:
+        if self.demo_local:
+            return 0
         reconciled = 0
         with SessionLocal() as session:
             runs = session.scalars(
@@ -67,6 +72,14 @@ class SimulationPredictionService:
     def cleanup_expired(self) -> int:
         expired = 0
         now = utc_now()
+        if self.demo_local:
+            for run in self._runs.values():
+                if run.status == "succeeded" and _utc_datetime(run.expires_at) <= now:
+                    self._remove_artifact(run)
+                    run.status = "expired"
+                    run.finished_at = run.finished_at or now
+                    expired += 1
+            return expired
         with SessionLocal() as session:
             runs = session.scalars(
                 select(SimulationPredictionRun).where(
@@ -91,6 +104,68 @@ class SimulationPredictionService:
     ) -> SimulationPredictionRun:
         with self.lock:
             self.cleanup_expired()
+            if self.demo_local:
+                simulation = self.simulations.get(simulation_id)
+                if simulation is None or simulation.actor != actor:
+                    raise LookupError("Simulation not found.")
+                if simulation.status != "succeeded":
+                    raise ValueError("A completed simulation is required before prediction.")
+                if _utc_datetime(simulation.expires_at) <= utc_now():
+                    raise ValueError("The selected simulation has expired. Create a new scenario.")
+                if not self.simulations.artifact_path(simulation).is_file():
+                    raise ValueError("The selected simulation artifact is unavailable.")
+                if simulation.rows > self.config.max_prediction_rows:
+                    raise ValueError("The simulation exceeds the prediction row limit.")
+                active = next(
+                    (item for item in self._runs.values() if item.status in {"queued", "running"}),
+                    None,
+                )
+                if active is not None:
+                    raise RuntimeError(f"A prediction is already running: {active.prediction_id}")
+                policy_payload = None
+                policy_version_id = None
+                policy_hash = None
+                if request.mode == "policy_comparison":
+                    policy_config, policy_version = get_active_policy()
+                    policy_payload = policy_config_to_dict(policy_config)
+                    policy_version_id = policy_version.version_id if policy_version else None
+                    policy_hash = hashlib.sha256(
+                        json.dumps(policy_payload, sort_keys=True).encode("utf-8")
+                    ).hexdigest()
+                prediction_id = str(uuid4())
+                created_at = utc_now()
+                model_name = os.getenv("UPLIFT_MODEL_NAME", "uplift_model")
+                model_alias = os.getenv("UPLIFT_MODEL_ALIAS", "champion")
+                run = SimulationPredictionRun(
+                    prediction_id=prediction_id,
+                    simulation_id=simulation_id,
+                    actor=actor,
+                    status="queued",
+                    mode=request.mode,
+                    customer_value=request.customer_value,
+                    request_payload={
+                        "mode": request.mode,
+                        "customer_value": request.customer_value,
+                        "policy_config": policy_payload,
+                    },
+                    model_reference={
+                        "model_name": model_name,
+                        "model_alias": model_alias,
+                        "model_uri": f"models:/{model_name}@{model_alias}",
+                        "model_version": "pending",
+                    },
+                    policy_version_id=policy_version_id,
+                    policy_config_hash=policy_hash,
+                    artifact_filename=f"{prediction_id}.parquet",
+                    created_at=created_at,
+                    expires_at=min(
+                        _utc_datetime(simulation.expires_at),
+                        created_at + timedelta(seconds=self.config.retention_seconds),
+                    ),
+                )
+                self._runs[prediction_id] = run
+                self.executor.submit(self._run, prediction_id, request, policy_payload)
+                return run
             with SessionLocal() as session:
                 simulation = session.get(SimulationRun, simulation_id)
                 if simulation is None:
@@ -173,6 +248,8 @@ class SimulationPredictionService:
 
     def get(self, prediction_id: str) -> SimulationPredictionRun | None:
         self.cleanup_expired()
+        if self.demo_local:
+            return self._runs.get(prediction_id)
         with SessionLocal() as session:
             run = session.get(SimulationPredictionRun, prediction_id)
             if run is None:
@@ -182,6 +259,9 @@ class SimulationPredictionService:
 
     def list(self, actor: str, limit: int = 25) -> list[SimulationPredictionRun]:
         self.cleanup_expired()
+        if self.demo_local:
+            runs = [run for run in self._runs.values() if run.actor == actor]
+            return sorted(runs, key=lambda run: run.created_at or utc_now(), reverse=True)[:limit]
         with SessionLocal() as session:
             runs = session.scalars(
                 select(SimulationPredictionRun)
@@ -220,6 +300,18 @@ class SimulationPredictionService:
     def _run(
         self, prediction_id, request: SimulationPredictionRequest, policy_payload: dict | None
     ) -> None:
+        if self.demo_local:
+            run = self._runs.get(prediction_id)
+            if run is None:
+                return
+            simulation = self.simulations.get(run.simulation_id)
+            if simulation is None:
+                self._finish_failure(prediction_id, "The source simulation is unavailable.")
+                return
+            run.status = "running"
+            run.started_at = utc_now()
+            self._run_prediction(prediction_id, request, policy_payload, simulation)
+            return
         with SessionLocal() as session:
             run = session.get(SimulationPredictionRun, prediction_id)
             if run is None:
@@ -234,9 +326,29 @@ class SimulationPredictionService:
             run.started_at = utc_now()
             session.commit()
 
+        self._run_prediction(
+            prediction_id,
+            request,
+            policy_payload,
+            simulation,
+            simulation_rows=simulation_rows,
+            simulation_artifact=simulation_artifact,
+        )
+
+    def _run_prediction(
+        self,
+        prediction_id,
+        request: SimulationPredictionRequest,
+        policy_payload: dict | None,
+        simulation: SimulationRun,
+        simulation_rows: int | None = None,
+        simulation_artifact: Path | None = None,
+    ) -> None:
         final_path = self.config.artifact_root / f"{prediction_id}.parquet"
         temporary_path = self.config.artifact_root / f".{prediction_id}.parquet.tmp"
         try:
+            simulation_rows = simulation_rows if simulation_rows is not None else simulation.rows
+            simulation_artifact = simulation_artifact or self.simulations.artifact_path(simulation)
             baseline = pd.read_parquet(self.config.baseline_path)
             simulated = pd.read_parquet(simulation_artifact)
             rows = simulation_rows
@@ -282,6 +394,16 @@ class SimulationPredictionService:
     def _finish_success(
         self, prediction_id: str, summary: PredictionComparisonSummary, size: int
     ) -> None:
+        if self.demo_local:
+            run = self._runs.get(prediction_id)
+            if run is None:
+                return
+            run.status = "succeeded"
+            run.model_reference = summary.model.model_dump()
+            run.summary_payload = summary.model_dump()
+            run.artifact_size_bytes = size
+            run.finished_at = utc_now()
+            return
         with SessionLocal() as session:
             run = session.get(SimulationPredictionRun, prediction_id)
             if run is None:
@@ -294,6 +416,14 @@ class SimulationPredictionService:
             session.commit()
 
     def _finish_failure(self, prediction_id: str, message: str) -> None:
+        if self.demo_local:
+            run = self._runs.get(prediction_id)
+            if run is None:
+                return
+            run.status = "failed"
+            run.error_summary = message
+            run.finished_at = utc_now()
+            return
         with SessionLocal() as session:
             run = session.get(SimulationPredictionRun, prediction_id)
             if run is None:
@@ -314,6 +444,8 @@ class SimulationPredictionService:
             session.commit()
 
     def _record_download(self, run: SimulationPredictionRun) -> None:
+        if self.demo_local:
+            return
         with SessionLocal() as session:
             session.add(
                 OperationAudit(

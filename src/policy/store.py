@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 
 from src.db.database import SessionLocal
 from src.db.models import DecisionLog, PolicyAudit, PolicyVersion
+from src.demo_config import demo_local_history_enabled
 from src.policy.config import ActionConfig, PolicyConfig, load_policy_config
 from src.policy.schemas import PolicyDocument
 
@@ -109,16 +110,17 @@ def ensure_policy_seed() -> None:
             change_summary="Initial policy seeded from YAML configuration.",
         )
         session.add(version)
-        session.add(
-            PolicyAudit(
-                audit_id=str(uuid4()),
-                action="seed",
-                actor="system-seed",
-                status="accepted",
-                outcome="Initial policy activated.",
-                target_version_id=version.version_id,
+        if not demo_local_history_enabled():
+            session.add(
+                PolicyAudit(
+                    audit_id=str(uuid4()),
+                    action="seed",
+                    actor="system-seed",
+                    status="accepted",
+                    outcome="Initial policy activated.",
+                    target_version_id=version.version_id,
+                )
             )
-        )
         session.commit()
 
 
@@ -175,17 +177,18 @@ def activate_policy(
             change_summary=change_summary or "Policy updated.",
         )
         session.add(version)
-        session.add(
-            PolicyAudit(
-                audit_id=str(uuid4()),
-                action=action,
-                actor=actor,
-                status="accepted",
-                outcome=change_summary or "Policy activated.",
-                source_version_id=source_version_id or actual_id,
-                target_version_id=version.version_id,
+        if not demo_local_history_enabled():
+            session.add(
+                PolicyAudit(
+                    audit_id=str(uuid4()),
+                    action=action,
+                    actor=actor,
+                    status="accepted",
+                    outcome=change_summary or "Policy activated.",
+                    source_version_id=source_version_id or actual_id,
+                    target_version_id=version.version_id,
+                )
             )
-        )
         session.commit()
         session.refresh(version)
         return version
@@ -224,7 +227,7 @@ def list_policy_versions(limit: int = 25) -> list[PolicyVersion]:
 
 
 def list_policy_audits(limit: int = 50) -> list[PolicyAudit]:
-    if not policy_store_enabled():
+    if not policy_store_enabled() or demo_local_history_enabled():
         return []
     with SessionLocal() as session:
         statement = select(PolicyAudit).order_by(PolicyAudit.created_at.desc()).limit(limit)
@@ -237,7 +240,7 @@ def record_policy_rejection(
     outcome: str,
     source_version_id: str | None = None,
 ) -> None:
-    if not policy_store_enabled():
+    if not policy_store_enabled() or demo_local_history_enabled():
         return
     with SessionLocal() as session:
         session.add(

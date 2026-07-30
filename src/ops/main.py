@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from src.db.database import SessionLocal, init_database
 from src.db.models import OperationAudit, OperationRun, SimulationPredictionRun, SimulationRun
+from src.demo_config import demo_local_history_enabled
 from src.monitoring.simulate_drift import (
     DriftSimulationRequest,
     DriftSimulationSummary,
@@ -76,6 +77,8 @@ def _record_audit(
     outcome: str,
     operation_id: str | None = None,
 ) -> None:
+    if demo_local_history_enabled():
+        return
     with SessionLocal() as session:
         session.add(
             OperationAudit(
@@ -186,7 +189,8 @@ def _prediction_response(run: SimulationPredictionRun) -> SimulationPredictionRe
 async def lifespan(app: FastAPI):
     init_database()
     ensure_policy_seed()
-    app.state.runner = OperationRunner()
+    app.state.demo_local_history = demo_local_history_enabled()
+    app.state.runner = OperationRunner(demo_local=app.state.demo_local_history)
     app.state.runner.reconcile_stale_jobs()
     app.state.simulations = SimulationService()
     app.state.simulations.initialize()
@@ -364,6 +368,8 @@ def rollback_policy_endpoint(
 @app.get("/operations", response_model=list[OperationResponse])
 def list_operations(limit: int = 25):
     limit = min(max(limit, 1), 100)
+    if app.state.demo_local_history:
+        return [_as_response(item) for item in app.state.runner.list(limit=limit)]
     with SessionLocal() as session:
         operations = session.scalars(
             select(OperationRun).order_by(OperationRun.created_at.desc()).limit(limit)
@@ -377,6 +383,11 @@ def get_operation(
     authorization: str | None = Header(default=None),
 ):
     _require_admin(authorization)
+    if app.state.demo_local_history:
+        operation_run = app.state.runner.get(operation_id)
+        if operation_run is None:
+            raise HTTPException(status_code=404, detail="Operation not found.")
+        return _as_response(operation_run, include_output=True)
     with SessionLocal() as session:
         operation_run = session.get(OperationRun, operation_id)
         if operation_run is None:
