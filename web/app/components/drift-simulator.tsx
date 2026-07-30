@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Panel, PanelHeading, StatusMessage } from "./control-center-shell";
 import { formatNumber, formatPercent, formatTime, safeError } from "./presentation";
+import { useDemoLocalHistory } from "../hooks/use-demo-local-history";
 
 type Preset = "low" | "medium" | "high" | "advanced";
 type TransformOperation = "scale_percent" | "shift";
@@ -111,14 +112,50 @@ export function DriftSimulatorPanel({ modelReady }: { modelReady?: boolean }) {
   const [customerValue, setCustomerValue] = useState("100");
   const [predictionBusy, setPredictionBusy] = useState(false);
   const [predictionMessage, setPredictionMessage] = useState("");
+  const { enabled: localHistoryEnabled, history, addSimulation, addPrediction, clearCollections } = useDemoLocalHistory();
 
   const loadRecent = useCallback(async () => {
+    if (localHistoryEnabled) return;
     const response = await fetch("/api/simulations?limit=5", { cache: "no-store" });
     if (response.ok) {
       const payload = await response.json();
       setRecent(payload.items ?? []);
     }
-  }, []);
+  }, [localHistoryEnabled]);
+
+  useEffect(() => {
+    if (!localHistoryEnabled || !simulation || simulation.status !== "succeeded" || !simulation.summary) return;
+    if (history.simulations.some((item) => item.simulationId === simulation.simulation_id)) return;
+    addSimulation({
+      simulationId: simulation.simulation_id,
+      createdAt: simulation.created_at ?? new Date().toISOString(),
+      status: simulation.status,
+      rows: simulation.summary.rows,
+      affectedFeatureCount: simulation.summary.affected_feature_count,
+      severity: simulation.summary.severity,
+      expiresAt: simulation.expires_at,
+      hasDownload: Boolean(simulation.downloads?.length),
+    });
+  }, [addSimulation, history.simulations, localHistoryEnabled, simulation]);
+
+  useEffect(() => {
+    if (!localHistoryEnabled || !prediction || prediction.status !== "succeeded" || !prediction.summary) return;
+    if (history.predictions.some((item) => item.predictionId === prediction.prediction_id)) return;
+    addPrediction({
+      predictionId: prediction.prediction_id,
+      simulationId: simulation?.simulation_id ?? "unknown",
+      createdAt: prediction.created_at ?? new Date().toISOString(),
+      rows: prediction.summary.rows,
+      mode: prediction.summary.mode,
+      upliftDelta: prediction.summary.uplift_delta,
+      expectedValueDelta: prediction.summary.expected_value_delta,
+      roiDelta: prediction.summary.roi_delta,
+      recommendationChangedCount: prediction.summary.recommendation_changed_count,
+      recommendationChangedShare: prediction.summary.recommendation_changed_share,
+      expiresAt: prediction.expires_at,
+      hasDownload: Boolean(prediction.downloads?.length),
+    });
+  }, [addPrediction, history.predictions, localHistoryEnabled, prediction, simulation?.simulation_id]);
 
   useEffect(() => {
     loadRecent().catch(() => undefined);
@@ -241,7 +278,10 @@ export function DriftSimulatorPanel({ modelReady }: { modelReady?: boolean }) {
     <button className="primary action-button" disabled={busy || (preset === "advanced" && selectedTransformations.length === 0)} onClick={submit}>{busy ? "Starting…" : "Run test scenario"}</button>
     {simulation && <SimulationResult simulation={simulation} />}
     {simulation?.status === "succeeded" && <PredictionPanel modelReady={modelReady} mode={predictionMode} setMode={setPredictionMode} customerValue={customerValue} setCustomerValue={setCustomerValue} busy={predictionBusy} message={predictionMessage} prediction={prediction} onRun={runPrediction} />}
+    {localHistoryEnabled && <div className="history-actions"><button className="text-button" onClick={() => { if (window.confirm("Clear Simulation Lab history?")) clearCollections(["simulations", "predictions"]); }}>Clear history</button></div>}
     {!simulation && recent.length > 0 && <div className="recent-simulations"><span className="eyebrow">RECENT TEST SCENARIOS</span>{recent.map((item) => <button className="recent-simulation" key={item.simulation_id} onClick={() => setSimulation(item)}><span>{item.summary ? `${item.summary.affected_feature_count} attributes changed` : statusLabel(item.status)}</span><small className="muted">{formatTime(item.created_at)}</small></button>)}</div>}
+    {!simulation && localHistoryEnabled && history.simulations.length > 0 && <div className="recent-simulations"><span className="eyebrow">RECENT TESTS</span>{history.simulations.slice(0, 5).map((item) => <div className="recent-simulation" key={item.simulationId}><span>{item.severity ? severityLabel(item.severity) : statusLabel(item.status)} · {formatNumber(item.affectedFeatureCount, 0)} attributes changed</span><small className="muted">{formatTime(item.createdAt)} · {item.hasDownload && item.expiresAt && new Date(item.expiresAt) > new Date() ? "Download available" : "Summary only"}</small></div>)}</div>}
+    {!simulation && localHistoryEnabled && history.predictions.length > 0 && <div className="recent-simulations"><span className="eyebrow">RECENT PREDICTION COMPARISONS</span>{history.predictions.slice(0, 5).map((item) => <div className="recent-simulation" key={item.predictionId}><span>{item.mode === "policy_comparison" ? "Recommendation comparison" : "Model response"}</span><small className="muted">{formatNumber(item.rows, 0)} paired records · uplift change {formatNumber(item.upliftDelta)}</small></div>)}</div>}
   </Panel>;
 }
 

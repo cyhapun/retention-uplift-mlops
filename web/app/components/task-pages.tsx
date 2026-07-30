@@ -6,6 +6,8 @@ import { ControlCenterShell, LoadingState, MetricCard, PageIntro, Panel, PanelHe
 import { DecisionForm } from "./decision-form";
 import { DriftSimulatorPanel } from "./drift-simulator";
 import { actionLabel, formatNumber, formatPercent, formatTime, METRIC_LABELS, operationLabel, reasonLabel, safeError, serviceLabel } from "./presentation";
+import { useDemoLocalHistory } from "../hooks/use-demo-local-history";
+import { demoLocalHistoryEnabled } from "../lib/demo-local-history";
 
 export type Overview = {
   environment: string;
@@ -54,18 +56,52 @@ function ShellPage({ active, intro, children, onRefresh, overview, refreshing }:
   return <ControlCenterShell active={active} environment={overview?.environment} refreshedAt={overview?.refreshed_at} onRefresh={onRefresh} refreshing={refreshing}><PageIntro {...intro} />{children}</ControlCenterShell>;
 }
 
+function DemoDecisionHistoryPanel() {
+  const { enabled, hydrated, history, addFeedbackBatch, clearCollections } = useDemoLocalHistory();
+  const [message, setMessage] = useState("");
+  if (!enabled) return null;
+
+  const simulateFeedback = () => {
+    const existing = new Set(history.feedback.map((item) => item.decisionId));
+    const pending = history.decisions.filter((item) => !existing.has(item.decisionId));
+    if (!pending.length) {
+      setMessage("There are no new decisions waiting for synthetic feedback.");
+      return;
+    }
+    const generated = pending.slice(0, 10).map((decision) => {
+      const probability = decision.recommendedAction === "no_action" ? 0.18 : 0.62;
+      const retained = Math.random() < probability;
+      return {
+        feedbackId: crypto.randomUUID(),
+        decisionId: decision.decisionId,
+        createdAt: new Date().toISOString(),
+        outcome: retained ? "retained" as const : "not_retained" as const,
+        probability,
+        realizedValue: retained ? decision.customerValue : -Math.max(0, decision.customerValue * 0.01),
+        delayDays: 7,
+      };
+    });
+    addFeedbackBatch(generated);
+    setMessage(`${generated.length} synthetic outcome${generated.length === 1 ? "" : "s"} added. They are not observed customer results.`);
+  };
+
+  return <Panel className="wide demo-history-panel"><PanelHeading eyebrow="RECENT HISTORY" title="Recent decisions and synthetic outcomes" />{!hydrated ? <p className="muted">Loading history…</p> : !history.decisions.length ? <p className="muted">No decisions yet. Run a decision above to create the first entry.</p> : <><div className="history-actions"><button className="secondary" onClick={simulateFeedback}>Simulate outcomes</button><button className="text-button" onClick={() => { if (window.confirm("Clear decisions and synthetic outcomes?")) clearCollections(["decisions", "feedback"]); }}>Clear decision history</button></div><div className="history-list">{history.decisions.slice(0, 8).map((item) => <div className="history-row" key={item.decisionId}><span><strong>{actionLabel(item.recommendedAction)}</strong><small className="muted">{item.userReference} · {formatTime(item.createdAt)}</small></span><span className="metric-value">Uplift {formatNumber(item.uplift)}</span></div>)}</div><p className="small muted">Synthetic outcomes recorded: {history.feedback.length}</p></>} {message && <StatusMessage kind="info">{message}</StatusMessage>}</Panel>;
+}
+
 export function OverviewPage() {
   const { overview, error, refreshing, load } = useOverview();
+  const { enabled: localHistoryEnabled, history: localHistory } = useDemoLocalHistory();
   if (!overview && refreshing) return <ControlCenterShell active="/" onRefresh={load} refreshing><LoadingState /></ControlCenterShell>;
   const healthyCount = overview?.services.filter((service) => service.status === "healthy").length ?? 0;
   const actionDistribution = overview?.metrics.action_distribution as Record<string, number> | undefined;
+  const recentDecisions = localHistoryEnabled ? localHistory.decisions.slice(0, 5).map((item) => ({ decision_id: item.decisionId, user_id: item.userReference, recommended_action: item.recommendedAction, uplift_score: item.uplift, created_at: item.createdAt })) : overview?.database.recent_decisions;
   return <ShellPage active="/" intro={{ eyebrow: "PLATFORM OVERVIEW", title: "Operate the uplift platform with confidence.", description: "See what is healthy, what needs attention, and where to go next." }} onRefresh={load} overview={overview} refreshing={refreshing}>
     <GlobalError error={error} retry={load} />
     <div className="hero-grid"><MetricCard label="Platform health" value={overview ? `${healthyCount}/${overview.services.length}` : "—"} unit="services healthy" description="Availability across the Control Center stack." /><MetricCard label="Champion model" value={overview?.model.model_loaded ? "Ready" : "Not ready"} unit={overview ? `${overview.model.model_name}@${overview.model.model_alias}` : "Waiting for model status"} description="The model used for live decisions." /><MetricCard label="Decisions logged" value={String(overview?.database.decision_count ?? "—")} unit={`${overview?.database.feedback_count ?? 0} feedback records`} description="Decisions currently stored for review." /><MetricCard label="Drift signal" value={overview?.drift.available ? (overview.drift.should_retrain ? "Review needed" : "Normal") : "No report"} unit={`${overview?.drift.n_drifted_features ?? 0} features changed`} description="Whether recent input data differs from the reference." /></div>
     <div className="content-grid overview-grid">
       <Panel className="wide"><PanelHeading eyebrow="LIVE SERVICES" title="System health" action={<span className="muted small">Checks every 15 seconds</span>} /><div className="service-list">{overview?.services.map((service) => <div className="service-row" key={service.name}><span className={`status-dot ${service.status}`} /><strong>{serviceLabel(service.name)}</strong><span className="muted service-detail">{service.status === "healthy" ? "Available" : "Needs attention"}</span><span className="metric-value">{service.latency_ms ? `${formatNumber(service.latency_ms, 0)} ms` : "—"}</span>{service.detail && <TechnicalDetails title="Details"><p>{service.detail}</p></TechnicalDetails>}</div>) ?? <LoadingState label="Checking services…" />}</div><SpecialistLinks links={overview?.links ?? {}} /></Panel>
       <Panel><PanelHeading eyebrow="MODEL STATUS" title="Champion model" /><div className={`model-status ${overview?.model.model_loaded ? "ready" : "warning"}`}><span className="status-dot healthy" /><strong>{overview?.model.model_loaded ? "Ready for decisions" : "Not ready yet"}</strong></div><p className="panel-description">{overview?.model.model_loaded ? "The current champion model is available to score customer profiles." : "Load a champion model before running a decision."}</p>{overview?.model.model_loaded && <TechnicalDetails><p>Model name: {overview.model.model_name}</p><p>Alias: {overview.model.model_alias}</p><p>Run reference: <code>{overview.model.model_uri}</code></p></TechnicalDetails>}</Panel>
-      <Panel><PanelHeading eyebrow="RECENT DECISIONS" title="What happened recently" />{overview?.database.recent_decisions?.length ? overview.database.recent_decisions.map((item) => <div className="job-row" key={item.decision_id}><span><strong>{actionLabel(item.recommended_action)}</strong><small className="muted">{item.user_id}</small></span><span className="metric-value">{formatNumber(item.uplift_score)}</span></div>) : <p className="muted">No decisions have been logged yet.</p>}</Panel>
+      <Panel><PanelHeading eyebrow="RECENT DECISIONS" title="What happened recently" />{recentDecisions?.length ? recentDecisions.map((item) => <div className="job-row" key={item.decision_id}><span><strong>{actionLabel(item.recommended_action)}</strong><small className="muted">{item.user_id}</small></span><span className="metric-value">{formatNumber(item.uplift_score)}</span></div>) : <p className="muted">{localHistoryEnabled ? "No browser decisions yet." : "No decisions have been logged yet."}</p>}</Panel>
       <Panel className="wide"><PanelHeading eyebrow="KEY METRICS" title="Platform signals" /><div className="metric-grid">{["request_rate", "error_rate", "average_uplift", "average_expected_value"].map((key) => { const meta = METRIC_LABELS[key]; return <MetricCard key={key} label={meta.label} value={formatNumber(overview?.metrics[key])} unit={meta.unit} description={meta.description} />; })}</div><p className="small muted metric-note">{actionDistribution ? `Actions recorded: ${Object.entries(actionDistribution).map(([action, count]) => `${actionLabel(action)} (${formatNumber(count, 0)})`).join(" · ")}` : "Action distribution is not available yet."}</p></Panel>
     </div>
   </ShellPage>;
@@ -73,7 +109,7 @@ export function OverviewPage() {
 
 export function DecisionsPage() {
   const { overview, error, refreshing, load } = useOverview();
-  return <ShellPage active="/decisions" intro={{ eyebrow: "DECISIONS", title: "Make a decision you can explain.", description: "Test a customer profile and understand the recommendation, value estimate, and reason behind it." }} onRefresh={load} overview={overview} refreshing={refreshing}><GlobalError error={error} retry={load} /><div className="content-grid two-column"><DecisionForm modelReady={Boolean(overview?.model.model_loaded)} onCompleted={load} /><Panel><PanelHeading eyebrow="HOW TO READ THIS" title="A practical guide" /><div className="guide-list"><div><strong>Uplift</strong><p className="muted">The estimated difference in retention caused by offering treatment instead of doing nothing.</p></div><div><strong>Expected value</strong><p className="muted">Estimated uplift multiplied by customer value, minus the offer cost.</p></div><div><strong>Estimated customer value</strong><p className="muted">A business assumption used for this calculation. The model does not discover it automatically.</p></div><div><strong>Recommendation</strong><p className="muted">The highest-priority action that passes the active policy thresholds.</p></div></div><SpecialistLinks links={overview?.links ?? {}} include={["mlflow", "api"]} /></Panel></div></ShellPage>;
+  return <ShellPage active="/decisions" intro={{ eyebrow: "DECISIONS", title: "Make a decision you can explain.", description: "Test a customer profile and understand the recommendation, value estimate, and reason behind it." }} onRefresh={load} overview={overview} refreshing={refreshing}><GlobalError error={error} retry={load} /><div className="content-grid two-column"><DecisionForm modelReady={Boolean(overview?.model.model_loaded)} onCompleted={load} /><Panel><PanelHeading eyebrow="HOW TO READ THIS" title="A practical guide" /><div className="guide-list"><div><strong>Uplift</strong><p className="muted">The estimated difference in retention caused by offering treatment instead of doing nothing.</p></div><div><strong>Expected value</strong><p className="muted">Estimated uplift multiplied by customer value, minus the offer cost.</p></div><div><strong>Estimated customer value</strong><p className="muted">A business assumption used for this calculation. The model does not discover it automatically.</p></div><div><strong>Recommendation</strong><p className="muted">The highest-priority action that passes the active policy thresholds.</p></div></div><SpecialistLinks links={overview?.links ?? {}} include={["mlflow", "api"]} /></Panel></div><DemoDecisionHistoryPanel /></ShellPage>;
 }
 
 export function MonitoringPage() {
@@ -95,6 +131,7 @@ export function OperationsPage() {
   const loadOperations = useCallback(async () => { const response = await fetch("/api/operations", { cache: "no-store" }); if (response.ok) setOperations(await response.json()); }, []);
   useEffect(() => { loadOperations(); }, [loadOperations]);
   const startOperation = async (operation: string) => { if (!window.confirm(`Start “${operationLabel(operation)}”?`)) return; setStarting(operation); setMessage(""); try { const response = await fetch(`/api/operations/${operation}`, { method: "POST" }); const payload = await response.json(); if (!response.ok) throw new Error(safeError(payload, "The operation could not be started.")); setMessage(`${operationLabel(operation)} is queued.`); await Promise.all([loadOperations(), load()]); } catch (caught) { setMessage(caught instanceof Error ? caught.message : "The operation could not be started."); } finally { setStarting(""); } };
-  const operationList = [["train-uplift", "Retrain uplift model", "Build a new model from the prepared training data."], ["register-uplift", "Register champion model", "Make a validated model available to the API."], ["drift-report", "Refresh production drift analysis", "Explicitly compare recent production data with the reference dataset."], ["simulate-feedback", "Simulate delayed feedback", "Generate feedback records for recent decisions."]] as const;
+  const operationList = [["train-uplift", "Retrain uplift model", "Build a new model from the prepared training data."], ["register-uplift", "Register champion model", "Make a validated model available to the API."]] as Array<readonly [string, string, string]>;
+  if (!demoLocalHistoryEnabled()) operationList.push(["simulate-feedback", "Simulate delayed feedback", "Generate feedback records for recent decisions."]);
   return <ShellPage active="/operations" intro={{ eyebrow: "OPERATIONS", title: "Run safe platform jobs.", description: "Start approved MLOps workflows with a clear status and a concise result. The control plane never exposes arbitrary shell commands." }} onRefresh={() => { load(); loadOperations(); }} overview={overview} refreshing={refreshing}><GlobalError error={error} retry={load} /><div className="content-grid two-column"><Panel><PanelHeading eyebrow="SAFE JOB CONTROLS" title="Approved workflows" />{!message ? null : <StatusMessage kind={message.includes("queued") ? "success" : "error"}>{message}</StatusMessage>}<div className="operation-cards">{operationList.map(([operation, label, description]) => <div className="operation-card" key={operation}><div><strong>{label}</strong><p className="muted">{description}</p></div><button className="secondary" disabled={Boolean(starting)} onClick={() => startOperation(operation)}>{starting === operation ? "Starting…" : "Start job"}</button></div>)}</div><p className="small muted">Changing platform state requires an administrator token configured on the server.</p></Panel><Panel><PanelHeading eyebrow="JOB HISTORY" title="Recent workflow runs" />{operations.length ? operations.slice(0, 8).map((item) => <div className="job-row" key={item.operation_id}><span><strong>{operationLabel(item.operation)}</strong><small className="muted">{formatTime(item.created_at)}</small></span><span className={`job-status ${item.status}`}>{item.status === "succeeded" ? "Completed" : item.status === "failed" ? "Failed" : item.status}</span>{item.error_summary && <TechnicalDetails><p>{item.error_summary}</p></TechnicalDetails>}</div>) : <p className="muted">No jobs have been recorded yet.</p>}</Panel></div></ShellPage>;
 }
