@@ -20,6 +20,13 @@ test("all task routes are present", async () => {
   assert.ok(routes.every((route) => route.includes("Page")));
 });
 
+test("browser tab uses the RetentionOps icon", async () => {
+  const layout = await read("app/layout.tsx");
+  const icon = await read("app/icon.svg");
+  assert.ok(layout.includes('icon: "/icon.svg"'));
+  assert.ok(icon.includes("RetentionOps"));
+});
+
 test("navigation exposes active task links and specialist details", async () => {
   const shell = await read("app/components/control-center-shell.tsx");
   const presentation = await read("app/components/presentation.ts");
