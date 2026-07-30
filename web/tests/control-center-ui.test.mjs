@@ -48,3 +48,19 @@ test("policy workflow exposes validation, preview, activation, and rollback", as
   assert.ok(page.includes("Read-only mode"));
   assert.ok(page.includes("Preview impact"));
 });
+
+test("drift simulator exposes guided controls and download routes", async () => {
+  const simulator = await read("app/components/drift-simulator.tsx");
+  const monitoring = await read("app/components/task-pages.tsx");
+  const routes = await Promise.all([
+    read("app/api/simulations/route.ts"),
+    read("app/api/simulations/[simulationId]/route.ts"),
+    read("app/api/simulations/[simulationId]/download/route.ts"),
+  ]);
+  assert.ok(simulator.includes("Choose which customer attributes change"));
+  assert.ok(simulator.includes("Download Parquet"));
+  assert.ok(simulator.includes("Download CSV"));
+  assert.ok(monitoring.includes("DriftSimulatorPanel"));
+  assert.ok(monitoring.includes("PRODUCTION DRIFT"));
+  assert.ok(routes.every((route) => route.includes("OPS_ADMIN_TOKEN")));
+});
