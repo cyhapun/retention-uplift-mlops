@@ -12,17 +12,18 @@ test("all task routes are present", async () => {
     read("app/page.tsx"),
     read("app/decisions/page.tsx"),
     read("app/monitoring/page.tsx"),
+    read("app/simulation-lab/page.tsx"),
     read("app/operations/page.tsx"),
     read("app/policy/page.tsx"),
   ]);
-  assert.equal(routes.length, 5);
+  assert.equal(routes.length, 6);
   assert.ok(routes.every((route) => route.includes("Page")));
 });
 
 test("navigation exposes active task links and specialist details", async () => {
   const shell = await read("app/components/control-center-shell.tsx");
   const presentation = await read("app/components/presentation.ts");
-  for (const href of ["/", "/decisions", "/monitoring", "/operations", "/policy"]) {
+  for (const href of ["/", "/decisions", "/monitoring", "/simulation-lab", "/operations", "/policy"]) {
     assert.ok(shell.includes(`href: "${href}"`));
   }
   assert.ok(shell.includes("TechnicalDetails"));
@@ -60,7 +61,10 @@ test("drift simulator exposes guided controls and download routes", async () => 
   assert.ok(simulator.includes("Choose which customer attributes change"));
   assert.ok(simulator.includes("Download Parquet"));
   assert.ok(simulator.includes("Download CSV"));
-  assert.ok(monitoring.includes("DriftSimulatorPanel"));
+  assert.ok(monitoring.includes("simulation-lab"));
   assert.ok(monitoring.includes("PRODUCTION DRIFT"));
   assert.ok(routes.every((route) => route.includes("OPS_ADMIN_TOKEN")));
+  assert.ok(simulator.includes("Run model comparison"));
+  assert.ok(simulator.includes("Illustrative customer value"));
+  assert.ok(simulator.includes("Download result (Parquet)"));
 });
